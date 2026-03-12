@@ -20,10 +20,10 @@ class _MPSplashScreenState extends State<MPSplashScreen> with SingleTickerProvid
   int _currentEmotionIndex = 0;
   final List<IconData> _emotions = [
     Icons.favorite,                   // Love/Happy
+    Icons.sentiment_dissatisfied, // Sad (to show we handle all moods)
     Icons.sentiment_satisfied_alt,    // Satisfied/Calm
     Icons.sentiment_very_satisfied,   // Very happy
     Icons.music_note,                 // Music
-    Icons.sentiment_dissatisfied,     // Sad (to show we handle all moods)
     Icons.eco,                        // Nature/Relaxed
   ];
   
