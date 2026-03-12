@@ -4,6 +4,8 @@ import 'package:http/http.dart' as http;
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 import 'package:just_audio/just_audio.dart';
 import '../player_page.dart';
+import 'MPSearchScreen.dart';
+import 'MPCameraScreen.dart';
 
 
 
@@ -149,6 +151,7 @@ class _DashboardPageState extends State<DashboardPage> {
 
     return Scaffold(
       backgroundColor: bgBottom,
+      endDrawer: _buildProfileDrawer(context),
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
@@ -165,29 +168,71 @@ class _DashboardPageState extends State<DashboardPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // 1. Header (Back, Title, Profile)
+                // 1. Header (Right Aligned Profile)
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  mainAxisAlignment: MainAxisAlignment.end,
                   children: [
-                    const Icon(Icons.arrow_back, color: textDark),
-                    const Text(
-                      "Your Mood Today",
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: textDark,
-                      ),
-                    ),
-                    CircleAvatar(
-                      radius: 18,
-                      backgroundColor: textDark.withOpacity(0.15),
-                      child: const Icon(
-                        Icons.person,
-                        size: 20,
-                        color: textDark,
-                      ),
+                    Builder(
+                      builder: (context) {
+                        return GestureDetector(
+                          onTap: () {
+                            Scaffold.of(context).openEndDrawer();
+                          },
+                          child: CircleAvatar(
+                            radius: 18,
+                            backgroundColor: textDark.withOpacity(0.15),
+                            child: const Icon(
+                              Icons.person,
+                              size: 20,
+                              color: textDark,
+                            ),
+                          ),
+                        );
+                      }
                     ),
                   ],
+                ),
+                const SizedBox(height: 24),
+
+                // Search Bar (Navigasi ke MPSearchScreen)
+                GestureDetector(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const MPSearchScreen(),
+                      ),
+                    );
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.35),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: Colors.white.withOpacity(0.5)),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.05),
+                          blurRadius: 10,
+                          offset: const Offset(0, 5),
+                        )
+                      ]
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.search, color: textDark.withOpacity(0.8), size: 24),
+                        const SizedBox(width: 12),
+                        Text(
+                          "Cari lagu, artis, atau album...",
+                          style: TextStyle(
+                            color: textDark.withOpacity(0.7),
+                            fontSize: 15,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
                 const SizedBox(height: 24),
 
@@ -230,7 +275,7 @@ class _DashboardPageState extends State<DashboardPage> {
                           const Color(0xFF556942), const Color(0xFFF9F6D6)),
                       const SizedBox(height: 24),
                       Text(
-                        "lagi galau dan bingung mau mendengarkan musik, mau dengar hal baru?",
+                        "lagi galau dan bingung mau mendengarkan musik, mau mendengar hal baru?",
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           fontWeight: FontWeight.w800,
@@ -396,29 +441,155 @@ class _DashboardPageState extends State<DashboardPage> {
           ),
         ),
       ),
-      // Bottom Navigation Bar matching the image
-      bottomNavigationBar: Theme(
-        data: ThemeData(
-          splashColor: Colors.transparent,
-          highlightColor: Colors.transparent,
+      // Bottom Navigation Bar with Center Camera FAB
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          // Navigasi ke Halaman Deteksi Emosi (Kamera)
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => const MPCameraScreen(),
+            ),
+          );
+        },
+        backgroundColor: accentGold,
+        elevation: 8,
+        shape: const CircleBorder(),
+        child: const Icon(
+          Icons.sentiment_satisfied_alt, // Emote/camera icon
+          color: Colors.white,
+          size: 32,
         ),
-        child: BottomNavigationBar(
-          backgroundColor: const Color(0xFF1E2E17),
-          selectedItemColor: accentGold,
-          unselectedItemColor: Colors.white54,
-          type: BottomNavigationBarType.fixed,
-          selectedFontSize: 10,
-          unselectedFontSize: 10,
-          elevation: 0,
-          items: const [
-            BottomNavigationBarItem(
-                icon: Icon(Icons.home_filled), label: 'Home'),
-            BottomNavigationBarItem(
-                icon: Icon(Icons.explore_outlined), label: 'Discover'),
-            BottomNavigationBarItem(
-                icon: Icon(Icons.library_music_outlined), label: 'Library'),
-            BottomNavigationBarItem(
-                icon: Icon(Icons.person_outline), label: 'Profile'),
+      ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
+      bottomNavigationBar: BottomAppBar(
+        color: const Color(0xFF1E2E17),
+        shape: const CircularNotchedRectangle(),
+        notchMargin: 8.0,
+        height: 70, // Ditinggikan sedikit untuk menghindari overflow
+        padding: const EdgeInsets.symmetric(horizontal: 8.0),
+        child: Row(
+          mainAxisSize: MainAxisSize.max,
+          children: [
+            _buildBottomNavItem(Icons.home_filled, 'Home', true),
+            _buildBottomNavItem(Icons.explore_outlined, 'Discover', false),
+            const SizedBox(width: 56), // Spasi yang lebih luas untuk tombol kamera di tengah
+            _buildBottomNavItem(Icons.library_music_outlined, 'Library', false),
+            _buildBottomNavItem(Icons.person_outline, 'Profile', false),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Widget custom untuk item BottomAppBar
+  Widget _buildBottomNavItem(IconData icon, String label, bool isSelected) {
+    const Color accentGold = Color(0xFFD8A854);
+    
+    return Expanded(
+      child: InkWell(
+        onTap: () {},
+        borderRadius: BorderRadius.circular(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              icon,
+              color: isSelected ? accentGold : Colors.white54,
+              size: 24,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: isSelected ? accentGold : Colors.white54,
+                fontSize: 10,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Profile Drawer Widget
+  Widget _buildProfileDrawer(BuildContext context) {
+    const Color bgBottom = Color(0xFF1A2A14);
+    const Color accentGold = Color(0xFFD8A854);
+    
+    return Drawer(
+      backgroundColor: bgBottom,
+      child: SafeArea(
+        child: Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(24.0),
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: const Color(0xFF253B1D),
+                border: Border(
+                  bottom: BorderSide(color: Colors.white.withOpacity(0.1)),
+                ),
+              ),
+              child: Column(
+                children: [
+                  CircleAvatar(
+                    radius: 40,
+                    backgroundColor: accentGold.withOpacity(0.2),
+                    child: const Icon(Icons.person, size: 40, color: accentGold),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    "User Profile",
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    "user@famotion.com",
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.6),
+                      fontSize: 13,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            ListTile(
+              leading: const Icon(Icons.history, color: Colors.white70),
+              title: const Text("Baru Diputar", style: TextStyle(color: Colors.white)),
+              onTap: () {
+                Navigator.pop(context);
+                // Implementation for Recently Played
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.settings, color: Colors.white70),
+              title: const Text("Pengaturan dan Privasi", style: TextStyle(color: Colors.white)),
+              onTap: () {
+                Navigator.pop(context);
+                // Implementation for Settings & Privacy
+              },
+            ),
+            const Spacer(),
+            const Divider(color: Colors.white10),
+            ListTile(
+              leading: const Icon(Icons.logout, color: Colors.redAccent),
+              title: const Text("Keluar", style: TextStyle(color: Colors.redAccent)),
+              onTap: () {
+                Navigator.pop(context);
+                // Implementation for Logout
+              },
+            ),
+            const SizedBox(height: 16),
           ],
         ),
       ),
