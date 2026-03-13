@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 import 'package:just_audio/just_audio.dart';
-import '../player_page.dart';
 import 'MPSearchScreen.dart';
 import 'MPCameraScreen.dart';
 import 'MPLoginScreen.dart';
@@ -24,12 +22,11 @@ class _DashboardPageState extends State<DashboardPage> {
   List<dynamic> _musicList = [];
   bool _isLoading = true;
 
-  // Audio Player and YT Explode instance
+  // Audio Player
   final AudioPlayer _audioPlayer = AudioPlayer();
-  final YoutubeExplode _yt = YoutubeExplode();
 
   // State for currently playing track tracking
-  String? _currentlyPlayingVideoId;
+  String? _currentlyPlayingUrl;
   bool _isPlaying = false;
   
   // State for bottom navigation
@@ -47,7 +44,7 @@ class _DashboardPageState extends State<DashboardPage> {
           _isPlaying = state.playing;
           if (state.processingState == ProcessingState.completed) {
             _isPlaying = false;
-            _currentlyPlayingVideoId = null;
+            _currentlyPlayingUrl = null;
           }
         });
       }
@@ -57,7 +54,6 @@ class _DashboardPageState extends State<DashboardPage> {
   @override
   void dispose() {
     _audioPlayer.dispose();
-    _yt.close();
     super.dispose();
   }
 
@@ -69,7 +65,8 @@ class _DashboardPageState extends State<DashboardPage> {
       if (response.statusCode == 200) {
         if (mounted) {
           setState(() {
-            _musicList = json.decode(response.body);
+            var data = json.decode(response.body);
+            _musicList = data['songs'] ?? [];
             _isLoading = false;
           });
         }
@@ -84,7 +81,8 @@ class _DashboardPageState extends State<DashboardPage> {
         if (response.statusCode == 200) {
           if (mounted) {
             setState(() {
-              _musicList = json.decode(response.body);
+              var data = json.decode(response.body);
+              _musicList = data['songs'] ?? [];
               _isLoading = false;
             });
           }
@@ -97,23 +95,14 @@ class _DashboardPageState extends State<DashboardPage> {
     }
   }
 
-  String _formatDuration(dynamic durationInSeconds) {
-    if (durationInSeconds == null) return "--:--";
-    int totalSeconds = durationInSeconds is int
-        ? durationInSeconds
-        : int.tryParse(durationInSeconds.toString()) ?? 0;
-    int minutes = totalSeconds ~/ 60;
-    int seconds = totalSeconds % 60;
-    return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
-  }
 
-  Future<void> _playMusic(String videoId) async {
+  Future<void> _playMusic(String audioUrl) async {
     try {
-      if (_currentlyPlayingVideoId == videoId && _isPlaying) {
+      if (_currentlyPlayingUrl == audioUrl && _isPlaying) {
         // Pause if already playing this song
         await _audioPlayer.pause();
         return;
-      } else if (_currentlyPlayingVideoId == videoId && !_isPlaying) {
+      } else if (_currentlyPlayingUrl == audioUrl && !_isPlaying) {
         // Resume if paused
         await _audioPlayer.play();
         return;
@@ -122,23 +111,19 @@ class _DashboardPageState extends State<DashboardPage> {
       // Indicate loading for feedback (optional, but good UX)
       if (mounted) {
         setState(() {
-          _currentlyPlayingVideoId = videoId;
+          _currentlyPlayingUrl = audioUrl;
           _isPlaying = false; // Will be true when actually starts playing
         });
       }
 
-      // Fetch the audio stream URL using youtube_explode_dart
-      var manifest = await _yt.videos.streamsClient.getManifest(videoId);
-      var audioStreamInfo = manifest.audioOnly.withHighestBitrate();
-
-      // Set the audio source and play
-      await _audioPlayer.setUrl(audioStreamInfo.url.toString());
+      // Set the audio source and play direct from Spotify preview URL
+      await _audioPlayer.setUrl(audioUrl);
       await _audioPlayer.play();
     } catch (e) {
       debugPrint("Error playing music: $e");
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Could not play the selected track.")),
+          const SnackBar(content: Text("Could not play the selected track. It might not have a preview.")),
         );
       }
     }
@@ -426,16 +411,17 @@ class _DashboardPageState extends State<DashboardPage> {
                                 _musicList.length > 3 ? 3 : _musicList.length,
                             itemBuilder: (context, index) {
                               final track = _musicList[index];
-                              final videoId = track['videoId'];
+                              final audioUrl = track['preview'];
+                              // Fallback if there's no preview url provided, though this disables playback
                               return Padding(
                                 padding: const EdgeInsets.only(right: 12.0),
                                 child: _buildImageTrackCard(
                                   track['title'] ?? 'Unknown',
                                   track['artist'] ?? 'Unknown',
-                                  _formatDuration(track['duration']),
+                                  "00:30", // Spotify preview duration is typically 30s
                                   track['thumbnail'] ??
                                       'https://images.unsplash.com/photo-1518837695005-2083093ee35b?q=80&w=256&auto=format&fit=crop',
-                                  videoId,
+                                  audioUrl,
                                 ),
                               );
                             },
@@ -485,17 +471,17 @@ class _DashboardPageState extends State<DashboardPage> {
                     .entries
                     .map((entry) {
                   var track = entry.value;
-                  final videoId = track['videoId'];
+                  final audioUrl = track['preview'];
                   bool isTrackPlaying =
-                      _currentlyPlayingVideoId == videoId && _isPlaying;
+                      _currentlyPlayingUrl == audioUrl && _isPlaying && audioUrl != null;
 
                   return _buildPlaylistItem(
                     track['title'] ?? 'Unknown',
-                    _formatDuration(track['duration']),
+                    "00:30",
                     isTrackPlaying,
                     track['thumbnail'] ??
                         'https://images.unsplash.com/photo-1490730141103-6cac27aaab94?q=80&w=150&auto=format&fit=crop',
-                    videoId,
+                    audioUrl,
                   );
                 }),
 
@@ -680,12 +666,12 @@ class _DashboardPageState extends State<DashboardPage> {
 
   // Widget for the Image-based Tracks in the Horizontal List
   Widget _buildImageTrackCard(String title, String subtitle, String duration,
-      String imageUrl, String? videoId) {
-    bool isTrackPlaying = _currentlyPlayingVideoId == videoId && _isPlaying;
+      String imageUrl, String? audioUrl) {
+    bool isTrackPlaying = _currentlyPlayingUrl == audioUrl && _isPlaying && audioUrl != null;
     return GestureDetector(
         onTap: () {
-          if (videoId != null) {
-            _playMusic(videoId);
+          if (audioUrl != null) {
+            _playMusic(audioUrl);
           }
         },
         child: Container(
@@ -771,16 +757,8 @@ class _DashboardPageState extends State<DashboardPage> {
                           size: 16),
                     ),
                     onPressed: () {
-                      if (videoId != null) {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => PlayerPage(
-                              videoId: videoId,
-                              title: title,
-                            ),
-                          ),
-                        );
+                      if (audioUrl != null) {
+                        _playMusic(audioUrl);
                       }
                     },
                   ),
@@ -793,11 +771,11 @@ class _DashboardPageState extends State<DashboardPage> {
 
   // Widget for the List Items in the "For You" Section
   Widget _buildPlaylistItem(String title, String duration, bool isPlaying,
-      String imageUrl, String? videoId) {
+      String imageUrl, String? audioUrl) {
     return GestureDetector(
         onTap: () {
-          if (videoId != null) {
-            _playMusic(videoId);
+          if (audioUrl != null) {
+            _playMusic(audioUrl);
           }
         },
         child: Container(
@@ -865,16 +843,8 @@ class _DashboardPageState extends State<DashboardPage> {
                         const Icon(Icons.pause, color: Colors.white, size: 16),
                   ),
                   onPressed: () {
-                    if (videoId != null) {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => PlayerPage(
-                            videoId: videoId,
-                            title: title,
-                          ),
-                        ),
-                      );
+                    if (audioUrl != null) {
+                      _playMusic(audioUrl);
                     }
                   },
                 ),
@@ -900,16 +870,8 @@ class _DashboardPageState extends State<DashboardPage> {
                     ),
                   ),
                   onPressed: () {
-                    if (videoId != null) {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => PlayerPage(
-                            videoId: videoId,
-                            title: title,
-                          ),
-                        ),
-                      );
+                    if (audioUrl != null) {
+                      _playMusic(audioUrl);
                     }
                   },
                 ),
