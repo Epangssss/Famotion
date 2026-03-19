@@ -9,8 +9,6 @@ import 'MPDiscoverScreen.dart';
 import 'MPLibraryScreen.dart';
 import 'MPProfileScreen.dart';
 
-
-
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
 
@@ -28,7 +26,7 @@ class _DashboardPageState extends State<DashboardPage> {
   // State for currently playing track tracking
   String? _currentlyPlayingUrl;
   bool _isPlaying = false;
-  
+
   // State for bottom navigation
   int _currentIndex = 0;
 
@@ -95,7 +93,6 @@ class _DashboardPageState extends State<DashboardPage> {
     }
   }
 
-
   Future<void> _playMusic(String audioUrl) async {
     try {
       if (_currentlyPlayingUrl == audioUrl && _isPlaying) {
@@ -116,14 +113,22 @@ class _DashboardPageState extends State<DashboardPage> {
         });
       }
 
-      // Set the audio source and play direct from Spotify preview URL
+      // Stop current playback before setting a new URL to prevent interruption errors
+      await _audioPlayer.stop();
+
+      // Set the audio source and play
       await _audioPlayer.setUrl(audioUrl);
       await _audioPlayer.play();
+    } on PlayerInterruptedException catch (e) {
+      debugPrint("Player interrupted (likely skipped quickly): $e");
+      // Don't show a snackbar for this as it's a normal consequence of rapid tapping
     } catch (e) {
       debugPrint("Error playing music: $e");
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Could not play the selected track. It might not have a preview.")),
+          const SnackBar(
+              content: Text(
+                  "Could not play the selected track. It might not have a preview.")),
         );
       }
     }
@@ -131,19 +136,20 @@ class _DashboardPageState extends State<DashboardPage> {
 
   @override
   Widget build(BuildContext context) {
-    // Palet warna cerah, sejuk, dan hangat 
+    // Palet warna cerah, sejuk, dan hangat
     const Color bgTop = Color(0xFFDCE7CD);
     const Color bgMid = Color(0xFF6A8A53);
     const Color bgBottom = Color(0xFF1A2A14);
     const Color cardGradientStart = Color(0xFFF5F2D8);
     const Color cardGradientEnd = Color(0xFFE0AF84);
-    const Color textDark = Color(0xFF293B1F); 
+    const Color textDark = Color(0xFF293B1F);
     const Color textBrown = Color(0xFF534A31);
-    const Color accentGold = Color(0xFFD8A854); 
+    const Color accentGold = Color(0xFFD8A854);
 
     // Daftar layar yang akan ditampilkan sesuai index Bottom Navigation
     final List<Widget> _screens = [
-      _buildHomeContent(bgTop, bgMid, bgBottom, cardGradientStart, cardGradientEnd, textDark, textBrown, accentGold),
+      _buildHomeContent(bgTop, bgMid, bgBottom, cardGradientStart,
+          cardGradientEnd, textDark, textBrown, accentGold),
       const MPDiscoverScreen(),
       const MPLibraryScreen(),
       const MPProfileScreen(),
@@ -181,16 +187,22 @@ class _DashboardPageState extends State<DashboardPage> {
         color: const Color(0xFF1E2E17),
         shape: const CircularNotchedRectangle(),
         notchMargin: 8.0,
-        height: 70, // Ditinggikan sedikit untuk menghindari overflow
+        height: 85, // Ditinggikan sedikit untuk menghindari overflow
         padding: const EdgeInsets.symmetric(horizontal: 8.0),
         child: Row(
           mainAxisSize: MainAxisSize.max,
           children: [
-            _buildBottomNavItem(Icons.home_filled, 'Home', _currentIndex == 0, 0),
-            _buildBottomNavItem(Icons.explore_outlined, 'Discover', _currentIndex == 1, 1),
-            const SizedBox(width: 56), // Spasi yang lebih luas untuk tombol kamera di tengah
-            _buildBottomNavItem(Icons.library_music_outlined, 'Library', _currentIndex == 2, 2),
-            _buildBottomNavItem(Icons.person_outline, 'Profile', _currentIndex == 3, 3),
+            _buildBottomNavItem(
+                Icons.home_filled, 'Home', _currentIndex == 0, 0),
+            _buildBottomNavItem(
+                Icons.explore_outlined, 'Discover', _currentIndex == 1, 1),
+            const SizedBox(
+                width:
+                    56), // Spasi yang lebih luas untuk tombol kamera di tengah
+            _buildBottomNavItem(
+                Icons.library_music_outlined, 'Library', _currentIndex == 2, 2),
+            _buildBottomNavItem(
+                Icons.person_outline, 'Profile', _currentIndex == 3, 3),
           ],
         ),
       ),
@@ -199,8 +211,14 @@ class _DashboardPageState extends State<DashboardPage> {
 
   // Konten Utama Dashboard (Home)
   Widget _buildHomeContent(
-    Color bgTop, Color bgMid, Color bgBottom, Color cardGradientStart, 
-    Color cardGradientEnd, Color textDark, Color textBrown, Color accentGold) {
+      Color bgTop,
+      Color bgMid,
+      Color bgBottom,
+      Color cardGradientStart,
+      Color cardGradientEnd,
+      Color textDark,
+      Color textBrown,
+      Color accentGold) {
     return Container(
       decoration: BoxDecoration(
         gradient: LinearGradient(
@@ -221,24 +239,22 @@ class _DashboardPageState extends State<DashboardPage> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  Builder(
-                    builder: (context) {
-                      return GestureDetector(
-                        onTap: () {
-                          Scaffold.of(context).openEndDrawer();
-                        },
-                        child: CircleAvatar(
-                          radius: 18,
-                          backgroundColor: textDark.withOpacity(0.15),
-                          child: Icon(
-                            Icons.person,
-                            size: 20,
-                            color: textDark,
-                          ),
+                  Builder(builder: (context) {
+                    return GestureDetector(
+                      onTap: () {
+                        Scaffold.of(context).openEndDrawer();
+                      },
+                      child: CircleAvatar(
+                        radius: 18,
+                        backgroundColor: textDark.withOpacity(0.15),
+                        child: Icon(
+                          Icons.person,
+                          size: 20,
+                          color: textDark,
                         ),
-                      );
-                    }
-                  ),
+                      ),
+                    );
+                  }),
                 ],
               ),
               const SizedBox(height: 24),
@@ -254,22 +270,23 @@ class _DashboardPageState extends State<DashboardPage> {
                   );
                 },
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.35),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: Colors.white.withOpacity(0.5)),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.05),
-                        blurRadius: 10,
-                        offset: const Offset(0, 5),
-                      )
-                    ]
-                  ),
+                      color: Colors.white.withOpacity(0.35),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: Colors.white.withOpacity(0.5)),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.05),
+                          blurRadius: 10,
+                          offset: const Offset(0, 5),
+                        )
+                      ]),
                   child: Row(
                     children: [
-                      Icon(Icons.search, color: textDark.withOpacity(0.8), size: 24),
+                      Icon(Icons.search,
+                          color: textDark.withOpacity(0.8), size: 24),
                       const SizedBox(width: 12),
                       Text(
                         "Cari lagu, artis, atau album...",
@@ -369,8 +386,8 @@ class _DashboardPageState extends State<DashboardPage> {
                     ),
                   ),
                   Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 4),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                     decoration: BoxDecoration(
                       color: textDark.withOpacity(0.15),
                       borderRadius: BorderRadius.circular(12),
@@ -392,8 +409,7 @@ class _DashboardPageState extends State<DashboardPage> {
                   ? Padding(
                       padding: const EdgeInsets.symmetric(vertical: 40.0),
                       child: Center(
-                          child:
-                              CircularProgressIndicator(color: accentGold)),
+                          child: CircularProgressIndicator(color: accentGold)),
                     )
                   : _musicList.isEmpty
                       ? const Padding(
@@ -403,7 +419,7 @@ class _DashboardPageState extends State<DashboardPage> {
                                   style: TextStyle(color: Colors.white54))),
                         )
                       : SizedBox(
-                          height: 210,
+                          height: 230,
                           child: ListView.builder(
                             scrollDirection: Axis.horizontal,
                             physics: const BouncingScrollPhysics(),
@@ -411,14 +427,16 @@ class _DashboardPageState extends State<DashboardPage> {
                                 _musicList.length > 3 ? 3 : _musicList.length,
                             itemBuilder: (context, index) {
                               final track = _musicList[index];
-                              final audioUrl = track['preview'];
+                              final previewUrl = track['preview'];
+                              final streamUrl = track['stream_url'];
+                              final audioUrl = streamUrl ?? previewUrl;
                               // Fallback if there's no preview url provided, though this disables playback
                               return Padding(
                                 padding: const EdgeInsets.only(right: 12.0),
                                 child: _buildImageTrackCard(
                                   track['title'] ?? 'Unknown',
                                   track['artist'] ?? 'Unknown',
-                                  "00:30", // Spotify preview duration is typically 30s
+                                  track['duration'] ?? 'Full', // previously "Full"
                                   track['thumbnail'] ??
                                       'https://images.unsplash.com/photo-1518837695005-2083093ee35b?q=80&w=256&auto=format&fit=crop',
                                   audioUrl,
@@ -442,8 +460,7 @@ class _DashboardPageState extends State<DashboardPage> {
                       color: Colors.white70,
                     ),
                   ),
-                  Icon(Icons.more_horiz,
-                      color: Colors.white.withOpacity(0.7)),
+                  Icon(Icons.more_horiz, color: Colors.white.withOpacity(0.7)),
                 ],
               ),
               const SizedBox(height: 16),
@@ -471,13 +488,17 @@ class _DashboardPageState extends State<DashboardPage> {
                     .entries
                     .map((entry) {
                   var track = entry.value;
-                  final audioUrl = track['preview'];
-                  bool isTrackPlaying =
-                      _currentlyPlayingUrl == audioUrl && _isPlaying && audioUrl != null;
+                  final previewUrl = track['preview'];
+                  final streamUrl = track['stream_url'];
+                  final audioUrl = streamUrl ?? previewUrl;
+                  bool isTrackPlaying = _currentlyPlayingUrl == audioUrl &&
+                      _isPlaying &&
+                      audioUrl != null;
 
                   return _buildPlaylistItem(
                     track['title'] ?? 'Unknown',
-                    "00:30",
+                    track['artist'] ?? 'Unknown',
+                    track['duration'] ?? 'Full',
                     isTrackPlaying,
                     track['thumbnail'] ??
                         'https://images.unsplash.com/photo-1490730141103-6cac27aaab94?q=80&w=150&auto=format&fit=crop',
@@ -494,9 +515,10 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   // Widget custom untuk item BottomAppBar
-  Widget _buildBottomNavItem(IconData icon, String label, bool isSelected, int index) {
+  Widget _buildBottomNavItem(
+      IconData icon, String label, bool isSelected, int index) {
     const Color accentGold = Color(0xFFD8A854);
-    
+
     return Expanded(
       child: InkWell(
         onTap: () {
@@ -535,7 +557,7 @@ class _DashboardPageState extends State<DashboardPage> {
   Widget _buildProfileDrawer(BuildContext context) {
     const Color bgBottom = Color(0xFF1A2A14);
     const Color accentGold = Color(0xFFD8A854);
-    
+
     return Drawer(
       backgroundColor: bgBottom,
       child: SafeArea(
@@ -555,7 +577,8 @@ class _DashboardPageState extends State<DashboardPage> {
                   CircleAvatar(
                     radius: 40,
                     backgroundColor: accentGold.withOpacity(0.2),
-                    child: const Icon(Icons.person, size: 40, color: accentGold),
+                    child:
+                        const Icon(Icons.person, size: 40, color: accentGold),
                   ),
                   const SizedBox(height: 16),
                   const Text(
@@ -580,7 +603,8 @@ class _DashboardPageState extends State<DashboardPage> {
             const SizedBox(height: 16),
             ListTile(
               leading: const Icon(Icons.history, color: Colors.white70),
-              title: const Text("Baru Diputar", style: TextStyle(color: Colors.white)),
+              title: const Text("Baru Diputar",
+                  style: TextStyle(color: Colors.white)),
               onTap: () {
                 Navigator.pop(context);
                 // Implementation for Recently Played
@@ -588,7 +612,8 @@ class _DashboardPageState extends State<DashboardPage> {
             ),
             ListTile(
               leading: const Icon(Icons.settings, color: Colors.white70),
-              title: const Text("Pengaturan dan Privasi", style: TextStyle(color: Colors.white)),
+              title: const Text("Pengaturan dan Privasi",
+                  style: TextStyle(color: Colors.white)),
               onTap: () {
                 Navigator.pop(context);
                 // Implementation for Settings & Privacy
@@ -598,7 +623,8 @@ class _DashboardPageState extends State<DashboardPage> {
             const Divider(color: Colors.white10),
             ListTile(
               leading: const Icon(Icons.logout, color: Colors.redAccent),
-              title: const Text("Keluar", style: TextStyle(color: Colors.redAccent)),
+              title: const Text("Keluar",
+                  style: TextStyle(color: Colors.redAccent)),
               onTap: () {
                 Navigator.pop(context); // Menutup drawer terlebih dahulu
                 _showLogoutConfirmationDialog(context);
@@ -618,7 +644,8 @@ class _DashboardPageState extends State<DashboardPage> {
       builder: (BuildContext dialogContext) {
         return AlertDialog(
           backgroundColor: const Color(0xFF293B1F),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           title: const Text(
             "Konfirmasi Keluar",
             style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
@@ -646,16 +673,18 @@ class _DashboardPageState extends State<DashboardPage> {
               ),
               onPressed: () {
                 // Tutup dialog
-                Navigator.pop(dialogContext); 
+                Navigator.pop(dialogContext);
                 // Navigasi ke Halaman Login
                 Navigator.of(context).pushAndRemoveUntil(
-                  MaterialPageRoute(builder: (context) => const MPLoginScreen()),
+                  MaterialPageRoute(
+                      builder: (context) => const MPLoginScreen()),
                   (Route<dynamic> route) => false,
                 );
               },
               child: const Text(
                 "Keluar",
-                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                style:
+                    TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
               ),
             ),
           ],
@@ -664,10 +693,10 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
-  // Widget for the Image-based Tracks in the Horizontal List
   Widget _buildImageTrackCard(String title, String subtitle, String duration,
       String imageUrl, String? audioUrl) {
-    bool isTrackPlaying = _currentlyPlayingUrl == audioUrl && _isPlaying && audioUrl != null;
+    bool isTrackPlaying =
+        _currentlyPlayingUrl == audioUrl && _isPlaying && audioUrl != null;
     return GestureDetector(
         onTap: () {
           if (audioUrl != null) {
@@ -678,12 +707,13 @@ class _DashboardPageState extends State<DashboardPage> {
           width: 140,
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: isTrackPlaying 
-                ? const Color(0xFFD8A854).withOpacity(0.15) 
+            color: isTrackPlaying
+                ? const Color(0xFFD8A854).withOpacity(0.15)
                 : const Color(0xFF587744).withOpacity(0.4),
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
-              color: isTrackPlaying ? const Color(0xFFD8A854) : Colors.transparent,
+              color:
+                  isTrackPlaying ? const Color(0xFFD8A854) : Colors.transparent,
               width: 1.5,
             ),
           ),
@@ -695,11 +725,11 @@ class _DashboardPageState extends State<DashboardPage> {
                 borderRadius: BorderRadius.circular(14),
                 child: Image.network(
                   imageUrl,
-                  height: 110,
+                  height: 100,
                   width: double.infinity,
                   fit: BoxFit.cover,
                   errorBuilder: (context, error, stackTrace) => Container(
-                    height: 110,
+                    height: 100,
                     width: double.infinity,
                     color: Colors.white10,
                     child: const Icon(Icons.music_note,
@@ -770,8 +800,8 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   // Widget for the List Items in the "For You" Section
-  Widget _buildPlaylistItem(String title, String duration, bool isPlaying,
-      String imageUrl, String? audioUrl) {
+  Widget _buildPlaylistItem(String title, String subtitle, String duration,
+      bool isPlaying, String imageUrl, String? audioUrl) {
     return GestureDetector(
         onTap: () {
           if (audioUrl != null) {
@@ -848,7 +878,7 @@ class _DashboardPageState extends State<DashboardPage> {
                     }
                   },
                 ),
-         ] else ...[
+              ] else ...[
                 Icon(
                   Icons.more_horiz,
                   color: Colors.white.withOpacity(0.5),
@@ -881,10 +911,8 @@ class _DashboardPageState extends State<DashboardPage> {
         ));
   }
 
-
-
   // Widget khusus untuk logo tengah (Hati dengan Gelombang & Daun)
-Widget _buildCustomHeartLogo(Color iconColor, Color goldColor) {
+  Widget _buildCustomHeartLogo(Color iconColor, Color goldColor) {
     return SizedBox(
       height: 140,
       width: 140,
