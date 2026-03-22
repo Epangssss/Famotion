@@ -9,45 +9,23 @@ dotenv.config()
 const app = express()
 app.use(cors())
 
-const CLIENT_ID = process.env.SPOTIFY_CLIENT_ID
-const CLIENT_SECRET = process.env.SPOTIFY_CLIENT_SECRET
-
-// ==========================
-// ambil token spotify
-// ==========================
-async function getToken() {
-
-  const response = await axios.post(
-    "https://accounts.spotify.com/api/token",
-    "grant_type=client_credentials",
-    {
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded"
-      },
-      auth: {
-        username: CLIENT_ID,
-        password: CLIENT_SECRET
-      }
-    }
-  )
-
-  return response.data.access_token
-}
+const YOUTUBE_API_KEY = process.env.API_YT
 
 // ==========================
 // mapping emotion → query
 // ==========================
-function getQuery(emotion) {
+function getQueryList(emotion) {
   const queries = {
-    happy: ["Bruno Mars", "Dua Lipa", "Pharrell", "upbeat pop hits", "Taylor Swift"],
-    sad: ["Yung Kai Blue", "d4vd", "Billie Eilish", "sad emotional pop", "Adele"],
-    angry: ["Linkin Park", "Eminem", "hard rock", "Bring Me The Horizon", "Paramore"],
-    stress: ["Laufey", "NIKI", "lofi chill beats", "Daniel Caesar", "Mac Ayres"]
+    happy: ["Bruno Mars", "Dua Lipa", "Pharrell", "upbeat pop hits", "Taylor Swift", "Maroon 5", "Justin Timberlake", "Katy Perry"],
+    sad: ["Blue - Yung kai", "d4vd", "Billie Eilish", "sad emotional pop", "Adele", "Lewis Capaldi", "Olivia Rodrigo", "Sam Smith"],
+    angry: ["Linkin Park", "Eminem", "hard rock", "Bring Me The Horizon", "Paramore", "Slipknot", "Rage Against The Machine", "System Of A Down"],
   };
 
   const emotionList = queries[emotion] || ["relaxing chill pop", "Ed Sheeran", "John Mayer", "acoustic"];
-  // Pilih satu artis / kata kunci secara acak setiap kali dipanggil
-  return emotionList[Math.floor(Math.random() * emotionList.length)];
+
+  // Pilih dua artis / kata kunci secara acak setiap kali dipanggil
+  const shuffled = emotionList.sort(() => 0.5 - Math.random());
+  return shuffled.slice(0, 2).map(q => q + " music");
 }
 
 // ==========================
@@ -62,76 +40,157 @@ app.get("/", (req, res) => {
 })
 
 // ==========================
-// ambil musik dari spotify
+// Helper parse durasi ISO 8601 (PT3M4S) => MM:SS
+// ==========================
+function parseDurationData(isoDuration) {
+  if (!isoDuration) return { formatted: "0:00", totalMinutes: 0 };
+  const match = isoDuration.match(/PT(\d+H)?(\d+M)?(\d+S)?/);
+  const hours = parseInt(match?.[1]) || 0;
+  const minutes = parseInt(match?.[2]) || 0;
+  const seconds = parseInt(match?.[3]) || 0;
+  const totalMinutes = hours * 60 + minutes;
+  return { formatted: `${totalMinutes}:${seconds.toString().padStart(2, '0')}`, totalMinutes };
+}
+
+// ==========================
+// ambil musik dari youtube
 // ==========================
 app.get("/music", async (req, res) => {
-
   try {
-
     const emotion = req.query.emotion || "relax"
+    const limit = parseInt(req.query.limit) || 50
 
-    const limit = parseInt(req.query.limit) || 10
+    const queryList = getQueryList(emotion)
 
-    // Offset diatur lebih kecil (maks. 5) agar hasil dari pencarian spesifik artis tidak menjadi kosong
-    const offset = Math.floor(Math.random() * 5)
+    let allItems = []
 
-    const query = encodeURIComponent(getQuery(emotion))
+    // ==========================
+    // 1. MULTI QUERY + PAGINATION
+    // ==========================
+    for (let q of queryList) {
+      let nextPageToken = null
 
-    const token = await getToken()
+      for (let i = 0; i < 2; i++) { // 2 page per query (100 data)
+        const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=50&q=${encodeURIComponent(q)}&type=video&videoCategoryId=10&key=${YOUTUBE_API_KEY}${nextPageToken ? `&pageToken=${nextPageToken}` : ''}`
 
-    const response = await axios.get(
+        const response = await axios.get(url)
 
-      `https://api.spotify.com/v1/search?q=${query}&type=track&limit=${limit}&offset=${offset}&market=ID`,
+        allItems = [...allItems, ...response.data.items]
 
-      {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
+        nextPageToken = response.data.nextPageToken
+        if (!nextPageToken) break
       }
+    }
 
-    )
+    if (allItems.length === 0) {
+      return res.json({ emotion, total: 0, songs: [] })
+    }
 
-    const songs = response.data.tracks.items.map(track => ({
+    // ==========================
+    // 2. GET DURATIONS
+    // ==========================
+    // The maximum number of IDs for videos endpoint is 50. Since allItems can have up to 200 items,
+    // we need to chunk the video IDs before fetching durations.
+    const allVideoIds = allItems.map(i => i.id.videoId)
 
-      title: track.name,
+    let durations = {}
 
-      artist: track.artists[0].name,
+    // Chunk video IDs into batches of 50
+    for (let i = 0; i < allVideoIds.length; i += 50) {
+      const chunkIds = allVideoIds.slice(i, i + 50).join(',')
+      try {
+        const videoResponse = await axios.get(
+          `https://www.googleapis.com/youtube/v3/videos?part=contentDetails&id=${chunkIds}&key=${YOUTUBE_API_KEY}`
+        )
+        const vItems = videoResponse.data.items || []
+        vItems.forEach(v => {
+          durations[v.id] = v.contentDetails.duration
+        })
+      } catch (err) {
+        console.error("Error fetching video durations chunk: " + err.message)
+      }
+    }
 
-      album: track.album.name,
+    // ==========================
+    // 3. FILTER LAGU
+    // ==========================
+    let filtered = []
 
-      thumbnail: track.album.images[0]?.url,
+    for (let item of allItems) {
+      const videoId = item.id.videoId
+      const durationData = parseDurationData(durations[videoId])
 
-      duration: `${Math.floor(track.duration_ms / 60000)}:${Math.floor((track.duration_ms % 60000) / 1000).toString().padStart(2, '0')}`,
+      const title = item.snippet.title.toLowerCase()
 
-      spotify_url: track.external_urls.spotify,
+      // filter kualitas
+      if (
+        durationData.totalMinutes >= 1 &&
+        durationData.totalMinutes <= 8 && // lebih fleksibel
+        !title.includes("full album") &&
+        !title.includes("live") &&
+        !title.includes("concert")
+      ) {
+        filtered.push({ item, durationData })
+      }
+    }
 
-      stream_url:
-        `http://localhost:3000/stream?title=${encodeURIComponent(track.name)}&artist=${encodeURIComponent(track.artists[0].name)}`
+    // ==========================
+    // 4. DEDUPLICATE
+    // ==========================
+    const unique = []
+    const seen = new Set()
 
-    }))
+    for (let data of filtered) {
+      const title = data.item.snippet.title
+        .toLowerCase()
+        .replace(/\(.*?\)/g, "") // hapus (lyrics), (official), dll
+
+      if (!seen.has(title)) {
+        seen.add(title)
+        unique.push(data)
+      }
+    }
+
+    // ==========================
+    // 5. SHUFFLE + LIMIT
+    // ==========================
+    unique.sort(() => Math.random() - 0.5)
+
+    const finalItems = unique.slice(0, limit)
+
+    // ==========================
+    // 6. FORMAT OUTPUT
+    // ==========================
+    const songs = finalItems.map(({ item, durationData }) => {
+      const videoId = item.id.videoId
+
+      return {
+        title: item.snippet.title,
+        artist: item.snippet.channelTitle,
+        album: "YouTube Music",
+        thumbnail:
+          item.snippet.thumbnails?.high?.url ||
+          item.snippet.thumbnails?.medium?.url ||
+          item.snippet.thumbnails?.default?.url,
+        duration: durationData.formatted,
+        youtube_url: `https://www.youtube.com/watch?v=${videoId}`,
+        stream_url: `http://localhost:3000/stream?videoId=${videoId}`
+      }
+    })
 
     res.json({
-
-      emotion: emotion,
-
-      query: query,
-
+      emotion,
       total: songs.length,
-
-      songs: songs
-
+      songs
     })
 
   } catch (err) {
-
     console.log(err.response?.data || err.message)
 
     res.status(500).json({
       error: err.response?.data || err.message
     })
-
   }
-
 })
 
 // ==========================
@@ -139,30 +198,37 @@ app.get("/music", async (req, res) => {
 // ==========================
 app.get("/stream", (req, res) => {
 
+  const videoId = req.query.videoId
   const title = req.query.title
   const artist = req.query.artist
 
-  if (!title || !artist) {
-    return res.status(400).send("title and artist required")
+  let ytdlpArgs = [];
+
+  // Jika memiliki Id, stream video secara spesifik, jika tidak ya fallback search judul
+  if (videoId) {
+    ytdlpArgs = [
+      `https://www.youtube.com/watch?v=${videoId}`,
+      "-f", "bestaudio",
+      "-o", "-"
+    ];
+  } else if (title && artist) {
+    const search = `${title} ${artist}`
+    ytdlpArgs = [
+      `ytsearch1:${search}`,
+      "-f", "bestaudio",
+      "-o", "-"
+    ];
+  } else {
+    return res.status(400).send("videoId or title and artist required")
   }
 
-  const search = `${title} ${artist}`
-
-  //  const ytdlp = spawn("yt-dlp",[
-  const ytdlp = spawn("C:/tools/yt-dlp/yt-dlp.exe", [
-
-    `ytsearch1:${search}`,
-    "-f", "bestaudio",
-    "-o", "-"
-
-  ])
+  // const ytdlp = spawn("yt-dlp", ytdlpArgs)
+  const ytdlp = spawn("C:/tools/yt-dlp/yt-dlp.exe", ytdlpArgs)
 
   const ffmpeg = spawn("ffmpeg", [
-
     "-i", "pipe:0",
     "-f", "mp3",
     "-"
-
   ])
 
   ytdlp.stdout.pipe(ffmpeg.stdin)
@@ -172,10 +238,10 @@ app.get("/stream", (req, res) => {
 })
 
 // ==========================
-// run server
+// run serverF
 // ==========================
 app.listen(3000, () => {
 
-  console.log("Spotify Music API running on port 3000")
+  console.log("YouTube Music API running on port 3000")
 
 })

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 import '../player_page.dart';
+import '../services/audio_manager.dart';
+import '../utils/notification_helper.dart';
 
 class MPSearchScreen extends StatefulWidget {
   const MPSearchScreen({super.key});
@@ -11,8 +13,7 @@ class MPSearchScreen extends StatefulWidget {
 
 class _MPSearchScreenState extends State<MPSearchScreen> {
   final TextEditingController _searchController = TextEditingController();
-  final YoutubeExplode _yt = YoutubeExplode();
-  
+
   List<Video> _searchResults = [];
   bool _isLoading = false;
   String _searchQuery = "";
@@ -20,13 +21,12 @@ class _MPSearchScreenState extends State<MPSearchScreen> {
   @override
   void dispose() {
     _searchController.dispose();
-    _yt.close();
     super.dispose();
   }
 
   Future<void> _performSearch(String query) async {
     if (query.trim().isEmpty) return;
-    
+
     setState(() {
       _isLoading = true;
       _searchQuery = query;
@@ -34,10 +34,21 @@ class _MPSearchScreenState extends State<MPSearchScreen> {
     });
 
     try {
-      final searchList = await _yt.search.search(query);
+      // Tambahkan kata 'music' supaya YouTube bias ke lagu, bukan live stream / channel
+      final searchList = await AudioManager.instance.yt.search.search('$query music');
       if (mounted) {
+        final filtered = searchList.where((v) {
+          // Filter 1: Buang live stream (isLive == true atau tidak ada durasi)
+          if (v.isLive) return false;
+          final dur = v.duration;
+          if (dur == null) return false;
+          // Filter 2: Buang video terlalu pendek (shorts < 1 mnt) atau terlalu panjang (kompilasi/podcast > 7 mnt)
+          final mins = dur.inMinutes;
+          return mins >= 1 && mins <= 7;
+        }).take(20).toList();
+
         setState(() {
-          _searchResults = searchList.take(20).toList();
+          _searchResults = filtered;
           _isLoading = false;
         });
       }
@@ -64,14 +75,45 @@ class _MPSearchScreenState extends State<MPSearchScreen> {
     return "$twoDigitMinutes:$twoDigitSeconds";
   }
 
+  /// Bersihkan nama channel YouTube menjadi nama artis yang rapi.
+  /// Contoh: "Ed Sheeran - Topic" → "Ed Sheeran"
+  ///          "TaylorSwiftVEVO" → "TaylorSwift"
+  String _cleanArtistName(String channelName, String videoTitle) {
+    String artist = channelName;
+
+    // Hapus sufiks umum channel YouTube musik
+    final suffixes = [
+      RegExp(r'\s*-\s*Topic', caseSensitive: false),
+      RegExp(r'VEVO', caseSensitive: false),
+      RegExp(r'Official', caseSensitive: false),
+      RegExp(r'Records', caseSensitive: false),
+      RegExp(r'Music', caseSensitive: false),
+      RegExp(r'Entertainment', caseSensitive: false),
+      RegExp(r'Channel', caseSensitive: false),
+    ];
+    for (final pattern in suffixes) {
+      artist = artist.replaceAll(pattern, '').trim();
+    }
+
+    // Jika nama channel tidak informatif / terlalu pendek, coba ambil dari judul video.
+    // Format umum: "[Artis] - [Judul Lagu]"
+    if (artist.isEmpty || artist.length <= 2) {
+      if (videoTitle.contains(' - ')) {
+        artist = videoTitle.split(' - ').first.trim();
+      }
+    }
+
+    return artist.isNotEmpty ? artist : channelName;
+  }
+
   @override
   Widget build(BuildContext context) {
     // Colors matching the dashboard
     const Color bgTop = Color(0xFFDCE7CD);
     const Color bgMid = Color(0xFF6A8A53);
     const Color bgBottom = Color(0xFF1A2A14);
-    const Color textDark = Color(0xFF293B1F); 
-    const Color accentGold = Color(0xFFD8A854); 
+    const Color textDark = Color(0xFF293B1F);
+    const Color accentGold = Color(0xFFD8A854);
 
     return Scaffold(
       backgroundColor: bgBottom,
@@ -90,7 +132,8 @@ class _MPSearchScreenState extends State<MPSearchScreen> {
             children: [
               // Search Bar Header
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
                 child: Row(
                   children: [
                     GestureDetector(
@@ -104,22 +147,30 @@ class _MPSearchScreenState extends State<MPSearchScreen> {
                         decoration: BoxDecoration(
                           color: Colors.white.withOpacity(0.35),
                           borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: Colors.white.withOpacity(0.5)),
+                          border:
+                              Border.all(color: Colors.white.withOpacity(0.5)),
                         ),
                         child: TextField(
                           controller: _searchController,
                           autofocus: true,
-                          style: const TextStyle(color: textDark, fontSize: 16, fontWeight: FontWeight.w500),
+                          style: const TextStyle(
+                              color: textDark,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w500),
                           textInputAction: TextInputAction.search,
                           onSubmitted: _performSearch,
                           decoration: InputDecoration(
                             border: InputBorder.none,
                             hintText: "Cari lagu, artis, atau album...",
-                            hintStyle: TextStyle(color: textDark.withOpacity(0.6), fontWeight: FontWeight.normal),
-                            icon: Icon(Icons.search, color: textDark.withOpacity(0.8), size: 24),
+                            hintStyle: TextStyle(
+                                color: textDark.withOpacity(0.6),
+                                fontWeight: FontWeight.normal),
+                            icon: Icon(Icons.search,
+                                color: textDark.withOpacity(0.8), size: 24),
                             suffixIcon: _searchController.text.isNotEmpty
                                 ? IconButton(
-                                    icon: const Icon(Icons.clear, color: textDark, size: 20),
+                                    icon: const Icon(Icons.clear,
+                                        color: textDark, size: 20),
                                     onPressed: () {
                                       _searchController.clear();
                                       setState(() {});
@@ -136,7 +187,7 @@ class _MPSearchScreenState extends State<MPSearchScreen> {
                   ],
                 ),
               ),
-              
+
               // Content
               Expanded(
                 child: _isLoading
@@ -147,7 +198,9 @@ class _MPSearchScreenState extends State<MPSearchScreen> {
                         ? Center(
                             child: Text(
                               "Tidak ada hasil untuk '$_searchQuery'",
-                              style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 16),
+                              style: TextStyle(
+                                  color: Colors.white.withOpacity(0.8),
+                                  fontSize: 16),
                             ),
                           )
                         : _searchResults.isEmpty
@@ -155,7 +208,9 @@ class _MPSearchScreenState extends State<MPSearchScreen> {
                                 child: Column(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
-                                    Icon(Icons.search, size: 70, color: textDark.withOpacity(0.3)),
+                                    Icon(Icons.search,
+                                        size: 70,
+                                        color: textDark.withOpacity(0.3)),
                                     const SizedBox(height: 16),
                                     Text(
                                       "Temukan lagu favoritmu",
@@ -169,7 +224,8 @@ class _MPSearchScreenState extends State<MPSearchScreen> {
                                 ),
                               )
                             : ListView.builder(
-                                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 20, vertical: 8),
                                 physics: const BouncingScrollPhysics(),
                                 itemCount: _searchResults.length,
                                 itemBuilder: (context, index) {
@@ -188,12 +244,15 @@ class _MPSearchScreenState extends State<MPSearchScreen> {
   Widget _buildSearchResultItem(Video video) {
     return GestureDetector(
       onTap: () {
+        showSlidingInfoNotification(context, "Lagu akan segera diputar, mohon bersabar...");
         Navigator.push(
           context,
           MaterialPageRoute(
             builder: (_) => PlayerPage(
               videoId: video.id.value,
               title: video.title,
+              artist: _cleanArtistName(video.author, video.title),
+              imageUrl: video.thumbnails.highResUrl,
             ),
           ),
         );
@@ -220,7 +279,8 @@ class _MPSearchScreenState extends State<MPSearchScreen> {
                   width: 60,
                   height: 60,
                   color: Colors.white10,
-                  child: const Icon(Icons.music_note, color: Colors.white54, size: 30),
+                  child: const Icon(Icons.music_note,
+                      color: Colors.white54, size: 30),
                 ),
               ),
             ),
@@ -242,7 +302,7 @@ class _MPSearchScreenState extends State<MPSearchScreen> {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    "${video.author} • ${_formatDuration(video.duration)}",
+                    "${_cleanArtistName(video.author, video.title)} • ${_formatDuration(video.duration)}",
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
