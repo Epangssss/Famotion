@@ -2,8 +2,8 @@ import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:nb_utils/nb_utils.dart';
-import 'package:just_audio/just_audio.dart';
 import 'MPLoginScreen.dart';
+import '../services/audio_manager.dart';
 
 class MPSplashScreen extends StatefulWidget {
   const MPSplashScreen({Key? key}) : super(key: key);
@@ -15,7 +15,6 @@ class MPSplashScreen extends StatefulWidget {
 class _MPSplashScreenState extends State<MPSplashScreen>
     with SingleTickerProviderStateMixin {
   late AnimationController _animationController;
-  final AudioPlayer _audioPlayer = AudioPlayer();
 
   int _currentEmotionIndex = 0;
   final List<IconData> _emotions = [
@@ -54,11 +53,11 @@ class _MPSplashScreenState extends State<MPSplashScreen>
   Future<void> _playSplashMusic() async {
     try {
       // Memutar suara chime singkat dari URL stabil saat splash screen dimulai.
-      // Atau efek ambient relaksasi.
-      await _audioPlayer.setUrl(
+      final player = AudioManager.instance.audioPlayer;
+      await player.setUrl(
           'https://cdn.pixabay.com/download/audio/2022/10/25/audio_145d2e3d36.mp3?filename=success-chime-104928.mp3');
-      await _audioPlayer.setVolume(1.0);
-      await _audioPlayer.play();
+      await player.setVolume(1.0);
+      await player.play();
     } catch (e) {
       debugPrint("Could not play splash audio: $e");
     }
@@ -70,7 +69,7 @@ class _MPSplashScreenState extends State<MPSplashScreen>
     if (!mounted) return;
 
     // Stop audio before navigating just in case
-    await _audioPlayer.stop();
+    await AudioManager.instance.audioPlayer.stop();
     MPLoginScreen().launch(context,
         isNewTask: true, pageRouteAnimation: PageRouteAnimation.Fade);
   }
@@ -79,7 +78,6 @@ class _MPSplashScreenState extends State<MPSplashScreen>
   void dispose() {
     _animationController.dispose();
     _emotionTimer?.cancel();
-    _audioPlayer.dispose();
     super.dispose();
   }
 
@@ -190,8 +188,6 @@ class _MPSplashScreenState extends State<MPSplashScreen>
             ),
           ),
 
-
-
           // Center Foreground Main Content
           Center(
             child: Column(
@@ -226,7 +222,8 @@ class _MPSplashScreenState extends State<MPSplashScreen>
                                   decoration: BoxDecoration(
                                     shape: BoxShape.circle,
                                     border: Border.all(
-                                      color: const Color(0xFFDCE7CD).withOpacity(ringOpacity),
+                                      color: const Color(0xFFDCE7CD)
+                                          .withOpacity(ringOpacity),
                                       width: 1.5,
                                     ),
                                   ),
@@ -358,7 +355,6 @@ class _MPSplashScreenState extends State<MPSplashScreen>
     );
   }
 }
-
 
 // Music Staff Background (static)
 class _MusicStaffPainter extends CustomPainter {
