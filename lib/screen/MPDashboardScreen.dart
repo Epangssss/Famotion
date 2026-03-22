@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'dart:ui';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'package:just_audio/just_audio.dart';
+import '../player_page.dart';
+import '../services/audio_manager.dart';
+import '../utils/notification_helper.dart';
 import 'MPSearchScreen.dart';
 import 'MPCameraScreen.dart';
 import 'MPLoginScreen.dart';
@@ -20,12 +23,10 @@ class _DashboardPageState extends State<DashboardPage> {
   List<dynamic> _musicList = [];
   bool _isLoading = true;
 
-  // Audio Player
-  final AudioPlayer _audioPlayer = AudioPlayer();
-
   // State for currently playing track tracking
   String? _currentlyPlayingUrl;
   bool _isPlaying = false;
+  bool _isStartingPlayback = false;
 
   // State for bottom navigation
   int _currentIndex = 0;
@@ -35,23 +36,25 @@ class _DashboardPageState extends State<DashboardPage> {
     super.initState();
     _fetchMusic();
 
-    // Listen to player state changes to update UI across the app
-    _audioPlayer.playerStateStream.listen((state) {
-      if (mounted) {
-        setState(() {
-          _isPlaying = state.playing;
-          if (state.processingState == ProcessingState.completed) {
-            _isPlaying = false;
-            _currentlyPlayingUrl = null;
-          }
-        });
-      }
-    });
+    AudioManager.instance.isPlayingNotifier.addListener(_onPlayerStateChanged);
+    AudioManager.instance.currentUrlNotifier.addListener(_onPlayerStateChanged);
+  }
+
+  void _onPlayerStateChanged() {
+    if (mounted) {
+      setState(() {
+        _isPlaying = AudioManager.instance.isPlayingNotifier.value;
+        _currentlyPlayingUrl = AudioManager.instance.currentUrlNotifier.value;
+      });
+    }
   }
 
   @override
   void dispose() {
-    _audioPlayer.dispose();
+    AudioManager.instance.isPlayingNotifier
+        .removeListener(_onPlayerStateChanged);
+    AudioManager.instance.currentUrlNotifier
+        .removeListener(_onPlayerStateChanged);
     super.dispose();
   }
 
@@ -64,7 +67,9 @@ class _DashboardPageState extends State<DashboardPage> {
         if (mounted) {
           setState(() {
             var data = json.decode(response.body);
-            _musicList = data['songs'] ?? [];
+            List<dynamic> songs = data['songs'] ?? [];
+            songs.shuffle();
+            _musicList = songs;
             _isLoading = false;
           });
         }
@@ -80,7 +85,9 @@ class _DashboardPageState extends State<DashboardPage> {
           if (mounted) {
             setState(() {
               var data = json.decode(response.body);
-              _musicList = data['songs'] ?? [];
+              List<dynamic> songs = data['songs'] ?? [];
+              songs.shuffle();
+              _musicList = songs;
               _isLoading = false;
             });
           }
@@ -93,43 +100,52 @@ class _DashboardPageState extends State<DashboardPage> {
     }
   }
 
-  Future<void> _playMusic(String audioUrl) async {
+  Future<void> _playAndNavigate({
+    required String audioUrl,
+    required String title,
+    required String artist,
+    required String imageUrl,
+    bool navigate = true,
+  }) async {
+    if (_isStartingPlayback) return;
+    setState(() => _isStartingPlayback = true);
+    
+    if (mounted) {
+      showSlidingInfoNotification(context, "Lagu akan segera diputar, mohon bersabar...");
+    }
+
     try {
-      if (_currentlyPlayingUrl == audioUrl && _isPlaying) {
-        // Pause if already playing this song
-        await _audioPlayer.pause();
-        return;
-      } else if (_currentlyPlayingUrl == audioUrl && !_isPlaying) {
-        // Resume if paused
-        await _audioPlayer.play();
-        return;
+      await AudioManager.instance.playMusic(
+        audioUrl: audioUrl,
+        title: title,
+        artist: artist,
+        imageUrl: imageUrl,
+      );
+
+      if (navigate && mounted) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => PlayerPage(
+              videoId: '', // Not using YouTube if playing from dashboard
+              title: title,
+              artist: artist,
+              imageUrl: imageUrl,
+            ),
+          ),
+        );
       }
-
-      // Indicate loading for feedback (optional, but good UX)
-      if (mounted) {
-        setState(() {
-          _currentlyPlayingUrl = audioUrl;
-          _isPlaying = false; // Will be true when actually starts playing
-        });
-      }
-
-      // Stop current playback before setting a new URL to prevent interruption errors
-      await _audioPlayer.stop();
-
-      // Set the audio source and play
-      await _audioPlayer.setUrl(audioUrl);
-      await _audioPlayer.play();
-    } on PlayerInterruptedException catch (e) {
-      debugPrint("Player interrupted (likely skipped quickly): $e");
-      // Don't show a snackbar for this as it's a normal consequence of rapid tapping
     } catch (e) {
       debugPrint("Error playing music: $e");
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text(
-                  "Could not play the selected track. It might not have a preview.")),
+        showSlidingErrorNotification(
+          context,
+          "Gagal memutar lagu. Mungkin tidak ada preview yang tersedia.",
         );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isStartingPlayback = false);
       }
     }
   }
@@ -158,9 +174,20 @@ class _DashboardPageState extends State<DashboardPage> {
     return Scaffold(
       backgroundColor: bgBottom,
       endDrawer: _buildProfileDrawer(context),
-      body: IndexedStack(
-        index: _currentIndex,
-        children: _screens,
+      body: Stack(
+        children: [
+          IndexedStack(
+            index: _currentIndex,
+            children: _screens,
+          ),
+          // Mini Player — tampil di atas Bottom Nav saat ada lagu yang diputar
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: _buildMiniPlayer(accentGold),
+          ),
+        ],
       ),
       // Bottom Navigation Bar with Center Camera FAB
       floatingActionButton: FloatingActionButton(
@@ -229,288 +256,500 @@ class _DashboardPageState extends State<DashboardPage> {
         ),
       ),
       child: SafeArea(
-        child: SingleChildScrollView(
-          physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // 1. Header (Right Aligned Profile)
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  Builder(builder: (context) {
-                    return GestureDetector(
-                      onTap: () {
-                        Scaffold.of(context).openEndDrawer();
-                      },
-                      child: CircleAvatar(
-                        radius: 18,
-                        backgroundColor: textDark.withOpacity(0.15),
-                        child: Icon(
-                          Icons.person,
-                          size: 20,
-                          color: textDark,
+        child: RefreshIndicator(
+          onRefresh: _fetchMusic,
+          color: accentGold,
+          backgroundColor: bgBottom,
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(
+                parent: BouncingScrollPhysics()),
+            padding: const EdgeInsets.symmetric(vertical: 10),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // 1. Header (Right Aligned Profile)
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    Builder(builder: (context) {
+                      return GestureDetector(
+                        onTap: () {
+                          Scaffold.of(context).openEndDrawer();
+                        },
+                        child: CircleAvatar(
+                          radius: 18,
+                          backgroundColor: textDark.withOpacity(0.15),
+                          child: Icon(
+                            Icons.person,
+                            size: 20,
+                            color: textDark,
+                          ),
                         ),
+                      );
+                    }),
+                  ],
+                ),
+                const SizedBox(height: 24),
+
+                // Search Bar (Navigasi ke MPSearchScreen)
+                GestureDetector(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const MPSearchScreen(),
                       ),
                     );
-                  }),
-                ],
-              ),
-              const SizedBox(height: 24),
-
-              // Search Bar (Navigasi ke MPSearchScreen)
-              GestureDetector(
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const MPSearchScreen(),
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 14),
+                    decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.35),
+                        borderRadius: BorderRadius.circular(20),
+                        border:
+                            Border.all(color: Colors.white.withOpacity(0.5)),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.05),
+                            blurRadius: 10,
+                            offset: const Offset(0, 5),
+                          )
+                        ]),
+                    child: Row(
+                      children: [
+                        Icon(Icons.search,
+                            color: textDark.withOpacity(0.8), size: 24),
+                        const SizedBox(width: 12),
+                        Text(
+                          "Cari lagu, artis, atau album...",
+                          style: TextStyle(
+                            color: textDark.withOpacity(0.7),
+                            fontSize: 15,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
                     ),
-                  );
-                },
-                child: Container(
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                // 2. Mood Result Card (Soft Gradient/Glassmorphism)
+                Container(
+                  width: double.infinity,
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                      const EdgeInsets.symmetric(vertical: 32, horizontal: 20),
                   decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.35),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: Colors.white.withOpacity(0.5)),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
-                          blurRadius: 10,
-                          offset: const Offset(0, 5),
-                        )
-                      ]),
-                  child: Row(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [cardGradientStart, cardGradientEnd],
+                    ),
+                    borderRadius: BorderRadius.circular(24),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.1),
+                        blurRadius: 15,
+                        offset: const Offset(0, 10),
+                      )
+                    ],
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      Icon(Icons.search,
-                          color: textDark.withOpacity(0.8), size: 24),
-                      const SizedBox(width: 12),
                       Text(
-                        "Cari lagu, artis, atau album...",
+                        "Famotion",
+                        textAlign: TextAlign.center,
                         style: TextStyle(
-                          color: textDark.withOpacity(0.7),
-                          fontSize: 15,
-                          fontWeight: FontWeight.w500,
+                          fontSize: 26,
+                          fontWeight: FontWeight.bold,
+                          color: textBrown,
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      // Mockup Emoticon / Logo Custom (Hati, Gelombang, & Daun)
+                      _buildCustomHeartLogo(
+                          const Color(0xFF556942), const Color(0xFFF9F6D6)),
+                      const SizedBox(height: 24),
+                      Text(
+                        "lagi galau dan bingung mau mendengarkan musik, mau mendengar hal baru?",
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 16,
+                          color: textBrown.withOpacity(0.9),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        "Famotion hadir untuk menemukan mood musik yang tepat untuk perasaan anda.",
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: textBrown.withOpacity(0.8),
+                          fontSize: 14,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        "Analysis based on your activity and input.",
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: textBrown.withOpacity(0.6),
+                          fontSize: 11,
                         ),
                       ),
                     ],
                   ),
                 ),
-              ),
-              const SizedBox(height: 24),
+                const SizedBox(height: 32),
 
-              // 2. Mood Result Card (Soft Gradient/Glassmorphism)
-              Container(
-                width: double.infinity,
-                padding:
-                    const EdgeInsets.symmetric(vertical: 32, horizontal: 20),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [cardGradientStart, cardGradientEnd],
-                  ),
-                  borderRadius: BorderRadius.circular(24),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.1),
-                      blurRadius: 15,
-                      offset: const Offset(0, 10),
-                    )
-                  ],
-                ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.center,
+                // 3. Section: Explore Recommendations
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      "Famotion",
-                      textAlign: TextAlign.center,
+                      "EXPLORE RECOMMENDATIONS",
                       style: TextStyle(
-                        fontSize: 26,
+                        fontSize: 12,
                         fontWeight: FontWeight.bold,
-                        color: textBrown,
+                        letterSpacing: 0.5,
+                        color: textDark,
                       ),
                     ),
-                    const SizedBox(height: 24),
-                    // Mockup Emoticon / Logo Custom (Hati, Gelombang, & Daun)
-                    _buildCustomHeartLogo(
-                        const Color(0xFF556942), const Color(0xFFF9F6D6)),
-                    const SizedBox(height: 24),
-                    Text(
-                      "lagi galau dan bingung mau mendengarkan musik, mau mendengar hal baru?",
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontWeight: FontWeight.w800,
-                        fontSize: 16,
-                        color: textBrown.withOpacity(0.9),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      "Famotion hadir untuk menemukan mood musik yang tepat untuk perasaan anda.",
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: textBrown.withOpacity(0.8),
-                        fontSize: 14,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      "Analysis based on your activity and input.",
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: textBrown.withOpacity(0.6),
-                        fontSize: 11,
+                    // Tombol Refresh
+                    GestureDetector(
+                      onTap: () {
+                        setState(() => _isLoading = true);
+                        _fetchMusic();
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: textDark.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.refresh_rounded, size: 14, color: textDark),
+                            const SizedBox(width: 4),
+                            Text(
+                              "Refresh",
+                              style: TextStyle(
+                                  fontSize: 11,
+                                  color: textDark,
+                                  fontWeight: FontWeight.bold),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ],
                 ),
-              ),
-              const SizedBox(height: 32),
-
-              // 3. Section: Explore Recommendations
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    "EXPLORE RECOMMENDATIONS",
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 0.5,
-                      color: textDark,
-                    ),
+                const SizedBox(height: 16),
+                    ],
                   ),
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: textDark.withOpacity(0.15),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      "View All",
-                      style: TextStyle(
-                          fontSize: 11,
-                          color: textDark,
-                          fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
+                ),
 
-              // Horizontal ListView for Cards
-              _isLoading
-                  ? Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 40.0),
-                      child: Center(
-                          child: CircularProgressIndicator(color: accentGold)),
-                    )
-                  : _musicList.isEmpty
-                      ? const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 40.0),
-                          child: Center(
-                              child: Text("No recommendations available",
-                                  style: TextStyle(color: Colors.white54))),
-                        )
-                      : SizedBox(
-                          height: 230,
-                          child: ListView.builder(
-                            scrollDirection: Axis.horizontal,
-                            physics: const BouncingScrollPhysics(),
-                            itemCount:
-                                _musicList.length > 3 ? 3 : _musicList.length,
-                            itemBuilder: (context, index) {
-                              final track = _musicList[index];
-                              final previewUrl = track['preview'];
-                              final streamUrl = track['stream_url'];
-                              final audioUrl = streamUrl ?? previewUrl;
-                              // Fallback if there's no preview url provided, though this disables playback
-                              return Padding(
-                                padding: const EdgeInsets.only(right: 12.0),
-                                child: _buildImageTrackCard(
-                                  track['title'] ?? 'Unknown',
-                                  track['artist'] ?? 'Unknown',
-                                  track['duration'] ?? 'Full', // previously "Full"
-                                  track['thumbnail'] ??
-                                      'https://images.unsplash.com/photo-1518837695005-2083093ee35b?q=80&w=256&auto=format&fit=crop',
-                                  audioUrl,
-                                ),
-                              );
-                            },
-                          ),
+                // Horizontal ListView for Cards
+                _isLoading
+                    // Shimmer skeleton loading cards
+                    ? SizedBox(
+                        height: 230,
+                        child: ListView.builder(
+                          scrollDirection: Axis.horizontal,
+                          physics: const NeverScrollableScrollPhysics(),
+                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                          itemCount: 4,
+                          itemBuilder: (context, index) {
+                            return Padding(
+                              padding: const EdgeInsets.only(right: 12.0),
+                              child: _buildSkeletonCard(accentGold),
+                            );
+                          },
                         ),
-              const SizedBox(height: 32),
+                      )
+                    : _musicList.isEmpty
+                        ? const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 40.0),
+                            child: Center(
+                                child: Text("No recommendations available",
+                                    style: TextStyle(color: Colors.white54))),
+                          )
+                        : SizedBox(
+                            height: 230,
+                            child: ScrollConfiguration(
+                              behavior: ScrollConfiguration.of(context).copyWith(
+                                dragDevices: {
+                                  PointerDeviceKind.touch,
+                                  PointerDeviceKind.mouse,
+                                },
+                              ),
+                              child: ListView.builder(
+                                scrollDirection: Axis.horizontal,
+                                physics: const BouncingScrollPhysics(),
+                                padding: const EdgeInsets.symmetric(horizontal: 20),
+                                clipBehavior: Clip.none,
+                                itemCount: _musicList.length > 20
+                                    ? 20
+                                    : _musicList.length,
+                                itemBuilder: (context, index) {
+                                final track = _musicList[index];
+                                final previewUrl = track['preview'];
+                                final streamUrl = track['stream_url'];
+                                final audioUrl = streamUrl ?? previewUrl;
+                                // Fallback if there's no preview url provided, though this disables playback
+                                return Padding(
+                                  padding: const EdgeInsets.only(right: 12.0),
+                                  child: _buildImageTrackCard(
+                                    track['title'] ?? 'Unknown',
+                                    track['artist'] ?? 'Unknown',
+                                    track['duration'] ??
+                                        'Full', // previously "Full"
+                                    track['thumbnail'] ??
+                                        'https://images.unsplash.com/photo-1518837695005-2083093ee35b?q=80&w=256&auto=format&fit=crop',
+                                    audioUrl,
+                                  ),
+                                );
+                              },
+                            ), // ends ListView.builder
+                          ), // ends ScrollConfiguration
+                        ), // ends SizedBox
+                const SizedBox(height: 32),
 
-              // 4. Section: For You
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    "FOR YOU",
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 0.5,
-                      color: Colors.white70,
-                    ),
-                  ),
-                  Icon(Icons.more_horiz, color: Colors.white.withOpacity(0.7)),
-                ],
-              ),
-              const SizedBox(height: 16),
-
-              // Vertical List of Tracks
-              if (_isLoading)
                 Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 20.0),
-                  child: Center(
-                      child: CircularProgressIndicator(color: accentGold)),
-                )
-              else if (_musicList.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 20.0),
-                  child: Center(
-                      child: Text("No tracks available",
-                          style: TextStyle(color: Colors.white54))),
-                )
-              else
-                ..._musicList
-                    .skip(3)
-                    .take(3)
-                    .toList()
-                    .asMap()
-                    .entries
-                    .map((entry) {
-                  var track = entry.value;
-                  final previewUrl = track['preview'];
-                  final streamUrl = track['stream_url'];
-                  final audioUrl = streamUrl ?? previewUrl;
-                  bool isTrackPlaying = _currentlyPlayingUrl == audioUrl &&
-                      _isPlaying &&
-                      audioUrl != null;
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // 4. Section: For You
+                      Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      "FOR YOU",
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.5,
+                        color: Colors.white70,
+                      ),
+                    ),
+                    Icon(Icons.more_horiz,
+                        color: Colors.white.withOpacity(0.7)),
+                  ],
+                ),
+                const SizedBox(height: 16),
 
-                  return _buildPlaylistItem(
-                    track['title'] ?? 'Unknown',
-                    track['artist'] ?? 'Unknown',
-                    track['duration'] ?? 'Full',
-                    isTrackPlaying,
-                    track['thumbnail'] ??
-                        'https://images.unsplash.com/photo-1490730141103-6cac27aaab94?q=80&w=150&auto=format&fit=crop',
-                    audioUrl,
-                  );
-                }),
+                // Vertical List of Tracks
+                if (_isLoading)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 20.0),
+                    child: Center(
+                        child: CircularProgressIndicator(color: accentGold)),
+                  )
+                else if (_musicList.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 20.0),
+                    child: Center(
+                        child: Text("No tracks available",
+                            style: TextStyle(color: Colors.white54))),
+                  )
+                else
+                  ..._musicList
+                      .skip(10)
+                      .take(20)
+                      .toList()
+                      .asMap()
+                      .entries
+                      .map((entry) {
+                    var track = entry.value;
+                    final previewUrl = track['preview'];
+                    final streamUrl = track['stream_url'];
+                    final audioUrl = streamUrl ?? previewUrl;
+                    bool isTrackPlaying = _currentlyPlayingUrl == audioUrl &&
+                        _isPlaying &&
+                        audioUrl != null;
 
-              const SizedBox(height: 20),
-            ],
+                    return _buildPlaylistItem(
+                      track['title'] ?? 'Unknown',
+                      track['artist'] ?? 'Unknown',
+                      track['duration'] ?? 'Full',
+                      isTrackPlaying,
+                      track['thumbnail'] ??
+                          'https://images.unsplash.com/photo-1490730141103-6cac27aaab94?q=80&w=150&auto=format&fit=crop',
+                      audioUrl,
+                    );
+                  }),
+
+                      const SizedBox(height: 20),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
+    );
+  }
+
+  // ==========================================
+  // MINI PLAYER WIDGET
+  // ==========================================
+  Widget _buildMiniPlayer(Color accentGold) {
+    return ValueListenableBuilder<String?>(
+      valueListenable: AudioManager.instance.currentUrlNotifier,
+      builder: (context, currentUrl, _) {
+        // Hanya tampil jika ada lagu yang aktif
+        if (currentUrl == null || currentUrl.isEmpty) return const SizedBox.shrink();
+
+        return ValueListenableBuilder<String?>(
+          valueListenable: AudioManager.instance.titleNotifier,
+          builder: (context, title, _) {
+            return ValueListenableBuilder<String?>(
+              valueListenable: AudioManager.instance.artistNotifier,
+              builder: (context, artist, _) {
+                return ValueListenableBuilder<String?>(
+                  valueListenable: AudioManager.instance.imageUrlNotifier,
+                  builder: (context, imageUrl, _) {
+                    return ValueListenableBuilder<bool>(
+                      valueListenable: AudioManager.instance.isPlayingNotifier,
+                      builder: (context, isPlaying, _) {
+                        return GestureDetector(
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => PlayerPage(
+                                  videoId: '',
+                                  title: title ?? 'Unknown',
+                                  artist: artist ?? 'Unknown',
+                                  imageUrl: imageUrl ?? '',
+                                ),
+                              ),
+                            );
+                          },
+                          child: Container(
+                            margin: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF253B1D),
+                              borderRadius: BorderRadius.circular(20),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.4),
+                                  blurRadius: 20,
+                                  offset: const Offset(0, -4),
+                                )
+                              ],
+                              border: Border.all(
+                                color: Colors.white.withOpacity(0.08),
+                                width: 1,
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                // Album Art
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: imageUrl != null && imageUrl.isNotEmpty
+                                      ? Image.network(
+                                          imageUrl,
+                                          width: 46,
+                                          height: 46,
+                                          fit: BoxFit.cover,
+                                          errorBuilder: (_, __, ___) => Container(
+                                            width: 46,
+                                            height: 46,
+                                            color: Colors.white10,
+                                            child: const Icon(Icons.music_note, color: Colors.white54, size: 24),
+                                          ),
+                                        )
+                                      : Container(
+                                          width: 46,
+                                          height: 46,
+                                          color: Colors.white10,
+                                          child: const Icon(Icons.music_note, color: Colors.white54, size: 24),
+                                        ),
+                                ),
+                                const SizedBox(width: 12),
+                                // Title + Artist
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(
+                                        title ?? 'Unknown',
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 13,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        artist ?? 'Unknown',
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          color: Colors.white.withOpacity(0.6),
+                                          fontSize: 11,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                // Play / Pause
+                                IconButton(
+                                  icon: Icon(
+                                    isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                                    color: Colors.white,
+                                    size: 28,
+                                  ),
+                                  onPressed: () {
+                                    if (isPlaying) {
+                                      AudioManager.instance.audioPlayer.pause();
+                                    } else {
+                                      AudioManager.instance.audioPlayer.play();
+                                    }
+                                  },
+                                ),
+                                // Skip Next
+                                IconButton(
+                                  icon: Icon(
+                                    Icons.skip_next_rounded,
+                                    color: accentGold,
+                                    size: 28,
+                                  ),
+                                  onPressed: () {
+                                    AudioManager.instance.playNext();
+                                  },
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    );
+                  },
+                );
+              },
+            );
+          },
+        );
+      },
     );
   }
 
@@ -693,6 +932,55 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
+  // Animated shimmer skeleton card for loading state
+  Widget _buildSkeletonCard(Color accentGold) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0.3, end: 1.0),
+      duration: const Duration(milliseconds: 900),
+      curve: Curves.easeInOut,
+      builder: (context, value, child) {
+        return AnimatedOpacity(
+          opacity: value,
+          duration: const Duration(milliseconds: 400),
+          child: child,
+        );
+      },
+      onEnd: () {},
+      child: SizedBox(
+        width: 150,
+        height: 220,
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.08),
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Image placeholder
+              ClipRRect(
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                child: _ShimmerBox(width: 150, height: 150),
+              ),
+              const SizedBox(height: 10),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 10.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _ShimmerBox(width: 110, height: 10),
+                    const SizedBox(height: 6),
+                    _ShimmerBox(width: 75, height: 8),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildImageTrackCard(String title, String subtitle, String duration,
       String imageUrl, String? audioUrl) {
     bool isTrackPlaying =
@@ -700,7 +988,13 @@ class _DashboardPageState extends State<DashboardPage> {
     return GestureDetector(
         onTap: () {
           if (audioUrl != null) {
-            _playMusic(audioUrl);
+            _playAndNavigate(
+              audioUrl: audioUrl,
+              title: title,
+              artist: subtitle,
+              imageUrl: imageUrl,
+              navigate: true,
+            );
           }
         },
         child: Container(
@@ -788,7 +1082,13 @@ class _DashboardPageState extends State<DashboardPage> {
                     ),
                     onPressed: () {
                       if (audioUrl != null) {
-                        _playMusic(audioUrl);
+                        _playAndNavigate(
+                          audioUrl: audioUrl,
+                          title: title,
+                          artist: subtitle,
+                          imageUrl: imageUrl,
+                          navigate: false,
+                        );
                       }
                     },
                   ),
@@ -805,7 +1105,13 @@ class _DashboardPageState extends State<DashboardPage> {
     return GestureDetector(
         onTap: () {
           if (audioUrl != null) {
-            _playMusic(audioUrl);
+            _playAndNavigate(
+              audioUrl: audioUrl,
+              title: title,
+              artist: subtitle,
+              imageUrl: imageUrl,
+              navigate: true,
+            );
           }
         },
         child: Container(
@@ -874,7 +1180,13 @@ class _DashboardPageState extends State<DashboardPage> {
                   ),
                   onPressed: () {
                     if (audioUrl != null) {
-                      _playMusic(audioUrl);
+                      _playAndNavigate(
+                        audioUrl: audioUrl,
+                        title: title,
+                        artist: subtitle,
+                        imageUrl: imageUrl,
+                        navigate: false,
+                      );
                     }
                   },
                 ),
@@ -901,7 +1213,13 @@ class _DashboardPageState extends State<DashboardPage> {
                   ),
                   onPressed: () {
                     if (audioUrl != null) {
-                      _playMusic(audioUrl);
+                      _playAndNavigate(
+                        audioUrl: audioUrl,
+                        title: title,
+                        artist: subtitle,
+                        imageUrl: imageUrl,
+                        navigate: false,
+                      );
                     }
                   },
                 ),
@@ -1057,4 +1375,50 @@ class WavePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+// Shimmer / Skeleton placeholder box widget
+class _ShimmerBox extends StatefulWidget {
+  final double width;
+  final double height;
+  const _ShimmerBox({required this.width, required this.height});
+
+  @override
+  State<_ShimmerBox> createState() => _ShimmerBoxState();
+}
+
+class _ShimmerBoxState extends State<_ShimmerBox> with SingleTickerProviderStateMixin {
+  late AnimationController _ctrl;
+  late Animation<double> _anim;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 900))
+      ..repeat(reverse: true);
+    _anim = Tween<double>(begin: 0.2, end: 0.45).animate(
+      CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _anim,
+      builder: (_, __) => Container(
+        width: widget.width,
+        height: widget.height,
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(_anim.value),
+          borderRadius: BorderRadius.circular(6),
+        ),
+      ),
+    );
+  }
 }
