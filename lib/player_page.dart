@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:palette_generator/palette_generator.dart';
 import 'services/audio_manager.dart';
+import 'services/playlist_manager.dart';
+import 'utils/notification_helper.dart';
 
 class PlayerPage extends StatefulWidget {
   final String videoId;
@@ -11,6 +13,7 @@ class PlayerPage extends StatefulWidget {
   final String artist;
   final String imageUrl;
   final String? searchQuery;
+  final int? durationMs;
 
   const PlayerPage({
     super.key,
@@ -19,6 +22,7 @@ class PlayerPage extends StatefulWidget {
     required this.artist,
     required this.imageUrl,
     this.searchQuery,
+    this.durationMs,
   });
 
   @override
@@ -43,6 +47,7 @@ class _PlayerPageState extends State<PlayerPage> {
         title: widget.title,
         artist: widget.artist,
         imageUrl: widget.imageUrl,
+        durationMs: widget.durationMs,
       );
     } else if (widget.searchQuery != null && widget.searchQuery!.isNotEmpty) {
       _searchAndPlay(widget.searchQuery!);
@@ -371,9 +376,23 @@ class _PlayerPageState extends State<PlayerPage> {
                         ],
                       ),
                     ),
-                    IconButton(
-                      icon: const Icon(Icons.favorite_border, color: Colors.white70, size: 20),
-                      onPressed: () {},
+                    ValueListenableBuilder<List<Map<String, dynamic>>>(
+                      valueListenable: PlaylistManager.instance.likedSongsNotifier,
+                      builder: (context, _, __) {
+                        final currentUrl = AudioManager.instance.currentUrlNotifier.value;
+                        final isLiked = PlaylistManager.instance.isLiked(currentUrl);
+
+                        return IconButton(
+                          icon: Icon(
+                            isLiked ? Icons.favorite : Icons.favorite_border,
+                            color: isLiked ? Colors.redAccent : Colors.white70,
+                            size: 20,
+                          ),
+                          onPressed: () {
+                            _handleLikeToggle();
+                          },
+                        );
+                      },
                     ),
                   ],
                 ),
@@ -546,31 +565,209 @@ class _PlayerPageState extends State<PlayerPage> {
     );
   }
 
+  void _handleLikeToggle() async {
+    final title = AudioManager.instance.titleNotifier.value;
+    final artist = AudioManager.instance.artistNotifier.value;
+    final imageUrl = AudioManager.instance.imageUrlNotifier.value;
+    final audioUrl = AudioManager.instance.currentUrlNotifier.value;
+    
+    // Fallback if not playing audioUrl right now
+    if (audioUrl == null || audioUrl.isEmpty) return;
+
+    final track = {
+      'title': title,
+      'artist': artist,
+      'imageUrl': imageUrl,
+      'audioUrl': audioUrl,
+      'videoId': audioUrl, // We might not have raw videoId, audioUrl is standard key
+    };
+
+    final isLikedNow = await PlaylistManager.instance.toggleLike(track);
+    if (mounted) {
+      if (isLikedNow) {
+         showSlidingInfoNotification(context, "Lagu disimpan ke Liked Songs");
+      } else {
+         showSlidingInfoNotification(context, "Lagu dihapus dari Liked Songs");
+      }
+    }
+  }
+
+  void _showAddToPlaylistBottomSheet(BuildContext context) {
+    final title = AudioManager.instance.titleNotifier.value;
+    final artist = AudioManager.instance.artistNotifier.value;
+    final imageUrl = AudioManager.instance.imageUrlNotifier.value;
+    final audioUrl = AudioManager.instance.currentUrlNotifier.value;
+    
+    if (audioUrl == null || audioUrl.isEmpty) return;
+
+    final track = {
+      'title': title,
+      'artist': artist,
+      'imageUrl': imageUrl,
+      'audioUrl': audioUrl,
+      'videoId': audioUrl, 
+    };
+
+    TextEditingController _newPlaylistController = TextEditingController();
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF1E2E17),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            return Padding(
+              padding: const EdgeInsets.all(20.0),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    "Simpan ke Playlist",
+                    style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 16),
+                  
+                  // Create new playlist row
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _newPlaylistController,
+                          style: const TextStyle(color: Colors.white),
+                          decoration: InputDecoration(
+                            hintText: "Nama playlist baru...",
+                            hintStyle: TextStyle(color: Colors.white.withOpacity(0.5)),
+                            filled: true,
+                            fillColor: Colors.white.withOpacity(0.1),
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      ElevatedButton(
+                        onPressed: () async {
+                          if (_newPlaylistController.text.trim().isNotEmpty) {
+                            await PlaylistManager.instance.createPlaylist(_newPlaylistController.text.trim());
+                            _newPlaylistController.clear();
+                            setSheetState(() {});
+                          }
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFD8A854),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                        ),
+                        child: const Icon(Icons.add, color: Colors.white),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  const Divider(color: Colors.white24),
+                  
+                  // Existing Playlists
+                  Expanded(
+                    child: ValueListenableBuilder<Map<String, List<Map<String, dynamic>>>>(
+                      valueListenable: PlaylistManager.instance.playlistsNotifier,
+                      builder: (context, playlists, _) {
+                        if (playlists.isEmpty) {
+                          return const Center(
+                            child: Text(
+                              "Belum ada playlist kustom.",
+                              style: TextStyle(color: Colors.white54),
+                            ),
+                          );
+                        }
+
+                        return ListView.builder(
+                          physics: const BouncingScrollPhysics(),
+                          itemCount: playlists.keys.length,
+                          itemBuilder: (context, index) {
+                            final playlistName = playlists.keys.elementAt(index);
+                            return ListTile(
+                              leading: const Icon(Icons.queue_music, color: Colors.white70),
+                              title: Text(playlistName, style: const TextStyle(color: Colors.white)),
+                              trailing: const Icon(Icons.add_circle_outline, color: Color(0xFFD8A854)),
+                              onTap: () async {
+                                await PlaylistManager.instance.addToPlaylist(playlistName, track);
+                                if (context.mounted) {
+                                  Navigator.pop(context);
+                                  showSlidingInfoNotification(context, "Disimpan ke playlist '$playlistName'");
+                                }
+                              },
+                            );
+                          },
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }
+        );
+      },
+    );
+  }
+
   Widget _buildTitleAndArtist() {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 32),
-      child: Column(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          ValueListenableBuilder<String?>(
-            valueListenable: AudioManager.instance.titleNotifier,
-            builder: (context, title, _) => Text(
-              title ?? 'Loading...',
-              style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
-              textAlign: TextAlign.center,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                ValueListenableBuilder<String?>(
+                  valueListenable: AudioManager.instance.titleNotifier,
+                  builder: (context, title, _) => Text(
+                    title ?? 'Loading...',
+                    style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                ValueListenableBuilder<String?>(
+                  valueListenable: AudioManager.instance.artistNotifier,
+                  builder: (context, artist, _) => Text(
+                    artist ?? 'Waiting for track info',
+                    style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 16),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 8),
-          ValueListenableBuilder<String?>(
-            valueListenable: AudioManager.instance.artistNotifier,
-            builder: (context, artist, _) => Text(
-              artist ?? 'Waiting for track info',
-              style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 16),
-              textAlign: TextAlign.center,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+          
+          ValueListenableBuilder<List<Map<String, dynamic>>>(
+            valueListenable: PlaylistManager.instance.likedSongsNotifier,
+            builder: (context, _, __) {
+              final currentUrl = AudioManager.instance.currentUrlNotifier.value;
+              final isLiked = PlaylistManager.instance.isLiked(currentUrl);
+
+              return IconButton(
+                icon: Icon(
+                  isLiked ? Icons.favorite : Icons.favorite_border,
+                  color: isLiked ? Colors.redAccent : Colors.white.withOpacity(0.9),
+                  size: 28,
+                ),
+                onPressed: _handleLikeToggle,
+              );
+            },
+          ),
+          IconButton(
+            icon: Icon(
+              Icons.playlist_add_rounded,
+              color: Colors.white.withOpacity(0.9),
+              size: 28,
             ),
+            onPressed: () => _showAddToPlaylistBottomSheet(context),
           ),
         ],
       ),
@@ -588,13 +785,22 @@ class _PlayerPageState extends State<PlayerPage> {
             Duration duration = durationSnapshot.data ?? Duration.zero;
 
             // Fallback ke durasi aslinya jika stream just_audio belum siap atau nyangkut di 0:00
-            final upcoming = AudioManager.instance.upcomingSongsNotifier.value;
-            if (_currentIndex >= 0 && _currentIndex < upcoming.length) {
-              final track = upcoming[_currentIndex];
-              if (track['durationMs'] != null && 
-                  (duration.inMilliseconds == 0 || duration.inHours > 99)) {
-                duration = Duration(milliseconds: track['durationMs'] as int);
+            int? fallbackMs = AudioManager.instance.durationMsNotifier.value;
+            
+            // Coba ambil dari urutan upcoming jika notifier kosong (meski jarang)
+            if (fallbackMs == null) {
+              final upcoming = AudioManager.instance.upcomingSongsNotifier.value;
+              if (_currentIndex >= 0 && _currentIndex < upcoming.length) {
+                final track = upcoming[_currentIndex];
+                if (track['durationMs'] != null) {
+                  fallbackMs = track['durationMs'] as int;
+                }
               }
+            }
+
+            if (fallbackMs != null && fallbackMs > 0 && 
+                (duration.inMilliseconds == 0 || duration.inHours > 99)) {
+              duration = Duration(milliseconds: fallbackMs);
             }
 
             final positionMill = position.inMilliseconds.toDouble();
@@ -688,24 +894,37 @@ class _PlayerPageState extends State<PlayerPage> {
             AudioManager.instance.playPrevious();
           },
         ),
-        Container(
-          margin: const EdgeInsets.symmetric(horizontal: 16),
-          width: 56 * sizeMult,
-          height: 56 * sizeMult,
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            shape: BoxShape.circle,
-          ),
-          child: IconButton(
-            icon: Icon(_isPlaying ? Icons.pause : Icons.play_arrow, color: Colors.black, size: 32 * sizeMult),
-            onPressed: () {
-              if (_isPlaying) {
-                AudioManager.instance.audioPlayer.pause();
-              } else {
-                AudioManager.instance.audioPlayer.play();
-              }
-            },
-          ),
+        StreamBuilder<ProcessingState>(
+          stream: AudioManager.instance.audioPlayer.processingStateStream,
+          builder: (context, snapshot) {
+            final processingState = snapshot.data ?? ProcessingState.idle;
+            final isLoading = processingState == ProcessingState.loading || processingState == ProcessingState.buffering;
+
+            return Container(
+              margin: const EdgeInsets.symmetric(horizontal: 16),
+              width: 56 * sizeMult,
+              height: 56 * sizeMult,
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                shape: BoxShape.circle,
+              ),
+              child: isLoading
+                  ? Padding(
+                      padding: EdgeInsets.all(16.0 * sizeMult),
+                      child: CircularProgressIndicator(color: Colors.black, strokeWidth: 3 * sizeMult),
+                    )
+                  : IconButton(
+                      icon: Icon(_isPlaying ? Icons.pause : Icons.play_arrow, color: Colors.black, size: 32 * sizeMult),
+                      onPressed: () {
+                        if (_isPlaying) {
+                          AudioManager.instance.audioPlayer.pause();
+                        } else {
+                          AudioManager.instance.audioPlayer.play();
+                        }
+                      },
+                    ),
+            );
+          },
         ),
         IconButton(
           icon: Icon(Icons.skip_next, color: Colors.white, size: 36 * sizeMult),
