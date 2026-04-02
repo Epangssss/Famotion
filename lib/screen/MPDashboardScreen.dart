@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import '../player_page.dart';
 import '../services/audio_manager.dart';
 import '../utils/notification_helper.dart';
+import '../widgets/empty_state_widget.dart';
 import 'MPSearchScreen.dart';
 import 'MPCameraScreen.dart';
 import 'MPLoginScreen.dart';
@@ -22,6 +23,8 @@ class DashboardPage extends StatefulWidget {
 class _DashboardPageState extends State<DashboardPage> {
   List<dynamic> _musicList = [];
   bool _isLoading = true;
+  bool _hasError = false;
+  String _errorMessage = "";
 
   // State for currently playing track tracking
   String? _currentlyPlayingUrl;
@@ -59,6 +62,12 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   Future<void> _fetchMusic() async {
+    setState(() {
+      _isLoading = true;
+      _hasError = false;
+      _errorMessage = "";
+    });
+
     try {
       // 10.0.2.2 is local host for Android Emulators. Change to 'localhost' if running on desktop/web.
       final response = await http.get(Uri.parse('http://10.0.2.2:3000/music'));
@@ -74,13 +83,18 @@ class _DashboardPageState extends State<DashboardPage> {
           });
         }
       } else {
-        if (mounted) setState(() => _isLoading = false);
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+            _hasError = true;
+            _errorMessage = "Gagal memuat data dari server (${response.statusCode}).";
+          });
+        }
       }
     } catch (e) {
       // Fallback for desktop/web
       try {
-        final response =
-            await http.get(Uri.parse('http://localhost:3000/music'));
+        final response = await http.get(Uri.parse('http://localhost:3000/music'));
         if (response.statusCode == 200) {
           if (mounted) {
             setState(() {
@@ -92,12 +106,34 @@ class _DashboardPageState extends State<DashboardPage> {
             });
           }
         } else {
-          if (mounted) setState(() => _isLoading = false);
+          if (mounted) {
+            setState(() {
+              _isLoading = false;
+              _hasError = true;
+              _errorMessage = "Gagal memuat data dari server lokal (${response.statusCode}).";
+            });
+          }
         }
       } catch (e2) {
-        if (mounted) setState(() => _isLoading = false);
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+            _hasError = true;
+            _errorMessage = "Koneksi ke server musik gagal. Pastikan server lokal berjalan.";
+          });
+        }
       }
     }
+  }
+
+  int _parseDuration(String? dur) {
+    if (dur == null || dur.trim().isEmpty || dur.trim().toLowerCase() == 'full') return 0;
+    final p = dur.split(':');
+    try {
+      if (p.length == 2) return (int.parse(p[0]) * 60 + int.parse(p[1])) * 1000;
+      if (p.length == 3) return (int.parse(p[0]) * 3600 + int.parse(p[1]) * 60 + int.parse(p[2])) * 1000;
+    } catch (_) {}
+    return 0;
   }
 
   Future<void> _playAndNavigate({
@@ -105,6 +141,7 @@ class _DashboardPageState extends State<DashboardPage> {
     required String title,
     required String artist,
     required String imageUrl,
+    String? durationStr,
     bool navigate = true,
   }) async {
     if (_isStartingPlayback) return;
@@ -120,6 +157,7 @@ class _DashboardPageState extends State<DashboardPage> {
         title: title,
         artist: artist,
         imageUrl: imageUrl,
+        durationMs: _parseDuration(durationStr),
       );
 
       if (navigate && mounted) {
@@ -477,13 +515,26 @@ class _DashboardPageState extends State<DashboardPage> {
                           },
                         ),
                       )
-                    : _musicList.isEmpty
-                        ? const Padding(
-                            padding: EdgeInsets.symmetric(vertical: 40.0),
-                            child: Center(
-                                child: Text("No recommendations available",
-                                    style: TextStyle(color: Colors.white54))),
+                    : _hasError
+                        ? MPEmptyStateWidget(
+                            icon: Icons.wifi_off_rounded,
+                            title: "Gagal Memuat Data",
+                            description: _errorMessage,
+                            buttonText: "Coba Lagi",
+                            onRetry: _fetchMusic,
+                            iconColor: Colors.redAccent,
+                            textColor: textDark,
                           )
+                        : _musicList.isEmpty
+                            ? MPEmptyStateWidget(
+                                icon: Icons.music_off_rounded,
+                                title: "Tidak Ada Rekomendasi",
+                                description: "Kami belum memiliki rekomendasi lagu untukmu saat ini.",
+                                buttonText: "Refresh",
+                                onRetry: _fetchMusic,
+                                iconColor: accentGold,
+                                textColor: textDark,
+                              )
                         : SizedBox(
                             height: 230,
                             child: ScrollConfiguration(
@@ -555,6 +606,13 @@ class _DashboardPageState extends State<DashboardPage> {
                     padding: const EdgeInsets.symmetric(vertical: 20.0),
                     child: Center(
                         child: CircularProgressIndicator(color: accentGold)),
+                  )
+                else if (_hasError)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 20.0),
+                    child: Center(
+                        child: Text("Gagal memuat daftar lagu.",
+                            style: TextStyle(color: Colors.white54))),
                   )
                 else if (_musicList.isEmpty)
                   const Padding(
@@ -993,6 +1051,7 @@ class _DashboardPageState extends State<DashboardPage> {
               title: title,
               artist: subtitle,
               imageUrl: imageUrl,
+              durationStr: duration,
               navigate: true,
             );
           }
@@ -1087,6 +1146,7 @@ class _DashboardPageState extends State<DashboardPage> {
                           title: title,
                           artist: subtitle,
                           imageUrl: imageUrl,
+                          durationStr: duration,
                           navigate: false,
                         );
                       }
@@ -1110,6 +1170,7 @@ class _DashboardPageState extends State<DashboardPage> {
               title: title,
               artist: subtitle,
               imageUrl: imageUrl,
+              durationStr: duration,
               navigate: true,
             );
           }
@@ -1185,6 +1246,7 @@ class _DashboardPageState extends State<DashboardPage> {
                         title: title,
                         artist: subtitle,
                         imageUrl: imageUrl,
+                        durationStr: duration,
                         navigate: false,
                       );
                     }
@@ -1218,6 +1280,7 @@ class _DashboardPageState extends State<DashboardPage> {
                         title: title,
                         artist: subtitle,
                         imageUrl: imageUrl,
+                        durationStr: duration,
                         navigate: false,
                       );
                     }
