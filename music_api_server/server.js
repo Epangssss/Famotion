@@ -3,6 +3,7 @@ import cors from "cors"
 import axios from "axios"
 import dotenv from "dotenv"
 import { spawn } from "child_process"
+import ytSearch from "yt-search"
 
 dotenv.config()
 
@@ -16,32 +17,33 @@ const YOUTUBE_API_KEY = process.env.API_YT
 // ==========================
 function getQueryList(emotion) {
   const queries = {
-    happy: ["Bruno Mars", "Dua Lipa", "Pharrell", "upbeat pop hits", "Taylor Swift", "Maroon 5", "Justin Timberlake", "Katy Perry"],
-    sad: ["Blue - Yung kai", "d4vd", "Billie Eilish", "sad emotional pop", "Adele", "Lewis Capaldi", "Olivia Rodrigo", "Sam Smith"],
-    angry: ["Linkin Park", "Eminem", "hard rock", "Bring Me The Horizon", "Paramore", "Slipknot", "Rage Against The Machine", "System Of A Down"],
+    happy: ["Bruno Mars", "Dua Lipa", "Pharrell", "upbeat pop hits", "Taylor Swift", "Maroon 5", "Justin Timberlake", "Katy Perry", "Coldplay", "Ed Sheeran happy"],
+    sad: ["Blue - Yung kai", "d4vd", "Billie Eilish", "sad emotional pop", "Adele", "Lewis Capaldi", "Olivia Rodrigo", "Sam Smith", "Joji", "Conan Gray"],
+    angry: ["Linkin Park", "Eminem", "hard rock", "Bring Me The Horizon", "Paramore", "Slipknot", "Rage Against The Machine", "System Of A Down", "Metallica", "Nirvana"],
   };
 
-  const emotionList = queries[emotion] || ["relaxing chill pop", "Ed Sheeran", "John Mayer", "acoustic"];
+  const emotionList = queries[emotion] || ["relaxing chill pop", "Ed Sheeran", "John Mayer", "acoustic", "lofi beats", "Daniel Caesar", "The Weeknd"];
 
-  // Pilih dua artis / kata kunci secara acak setiap kali dipanggil
-  const shuffled = emotionList.sort(() => 0.5 - Math.random());
-  return shuffled.slice(0, 2).map(q => q + " music");
+  // --- KODE LAMA (Pilih 2 acak dengan sort biasa) ---
+  // const shuffled = emotionList.sort(() => 0.5 - Math.random());
+  // return shuffled.slice(0, 2).map(q => q + " music");
+
+  // --- KODE BARU (Pilih 4 acak dengan Fisher-Yates yang akurat) ---
+  for (let i = emotionList.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [emotionList[i], emotionList[j]] = [emotionList[j], emotionList[i]];
+  }
+  return emotionList.slice(0, 4).map(q => q + " music");
 }
 
-// ==========================
-// test server
-// ==========================
 app.get("/", (req, res) => {
-
   res.json({
     status: "FAMOTION Music API running"
   })
-
 })
 
-// ==========================
+// --- KODE LAMA ---
 // Helper parse durasi ISO 8601 (PT3M4S) => MM:SS
-// ==========================
 function parseDurationData(isoDuration) {
   if (!isoDuration) return { formatted: "0:00", totalMinutes: 0 };
   const match = isoDuration.match(/PT(\d+H)?(\d+M)?(\d+S)?/);
@@ -65,20 +67,30 @@ app.get("/music", async (req, res) => {
     let allItems = []
 
     // ==========================
-    // 1. MULTI QUERY + PAGINATION
+    // 1. PENGAMBILAN DATA (FETCHING)
     // ==========================
+
+    /* --- KODE LAMA (GOOGLE API BERBAYAR / KUOTA) ---
     for (let q of queryList) {
       let nextPageToken = null
-
       for (let i = 0; i < 2; i++) { // 2 page per query (100 data)
-        const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=50&q=${encodeURIComponent(q)}&type=video&videoCategoryId=10&key=${YOUTUBE_API_KEY}${nextPageToken ? `&pageToken=${nextPageToken}` : ''}`
-
+        const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=50&q=${encodeURIComponent(q)}&type=video&videoCategoryId=10&key=${YOUTUBE_API_KEY}${nextPageToken ? \`&pageToken=${nextPageToken}\` : ''}`
         const response = await axios.get(url)
-
         allItems = [...allItems, ...response.data.items]
-
         nextPageToken = response.data.nextPageToken
         if (!nextPageToken) break
+      }
+    }
+    */
+
+    // --- KODE BARU (YT-SEARCH GRATIS) ---
+    for (let q of queryList) {
+      try {
+        const r = await ytSearch(q)
+        const videos = r.videos.slice(0, 15) // Kita ambil 15 per kueri (dari 4 kueri acak)
+        allItems = [...allItems, ...videos]
+      } catch(err) {
+        console.error("Error dari yt-search:", q, err)
       }
     }
 
@@ -87,50 +99,52 @@ app.get("/music", async (req, res) => {
     }
 
     // ==========================
-    // 2. GET DURATIONS
+    // 2. MENDAPATKAN DURASI PADA KODE LAMA (DI-SKIP DI BARU)
     // ==========================
-    // The maximum number of IDs for videos endpoint is 50. Since allItems can have up to 200 items,
-    // we need to chunk the video IDs before fetching durations.
+
+    /* --- KODE LAMA (Ambil Durasi Tambahan Pakai Kuota API) ---
     const allVideoIds = allItems.map(i => i.id.videoId)
-
     let durations = {}
-
-    // Chunk video IDs into batches of 50
     for (let i = 0; i < allVideoIds.length; i += 50) {
       const chunkIds = allVideoIds.slice(i, i + 50).join(',')
       try {
         const videoResponse = await axios.get(
-          `https://www.googleapis.com/youtube/v3/videos?part=contentDetails&id=${chunkIds}&key=${YOUTUBE_API_KEY}`
+          \`https://www.googleapis.com/youtube/v3/videos?part=contentDetails&id=\${chunkIds}&key=\${YOUTUBE_API_KEY}\`
         )
         const vItems = videoResponse.data.items || []
         vItems.forEach(v => {
           durations[v.id] = v.contentDetails.duration
         })
       } catch (err) {
-        console.error("Error fetching video durations chunk: " + err.message)
+        console.error("Error fetching chunk: " + err.message)
       }
     }
+    */
 
     // ==========================
     // 3. FILTER LAGU
     // ==========================
     let filtered = []
 
+    /* --- KODE LAMA ---
     for (let item of allItems) {
       const videoId = item.id.videoId
       const durationData = parseDurationData(durations[videoId])
-
       const title = item.snippet.title.toLowerCase()
 
-      // filter kualitas
-      if (
-        durationData.totalMinutes >= 1 &&
-        durationData.totalMinutes <= 8 && // lebih fleksibel
-        !title.includes("full album") &&
-        !title.includes("live") &&
-        !title.includes("concert")
-      ) {
+      if (durationData.totalMinutes >= 1 && durationData.totalMinutes <= 8 && !title.includes("full album") && !title.includes("live") && !title.includes("concert")) {
         filtered.push({ item, durationData })
+      }
+    }
+    */
+
+    // --- KODE BARU ---
+    for (let video of allItems) {
+      const title = video.title.toLowerCase()
+      const durationMins = video.duration.seconds / 60
+
+      if (durationMins >= 1 && durationMins <= 8 && !title.includes("full album") && !title.includes("live") && !title.includes("concert")) {
+        filtered.push(video) // video sudah memuat durasi, thumbnail, URL, dsb
       }
     }
 
@@ -140,41 +154,64 @@ app.get("/music", async (req, res) => {
     const unique = []
     const seen = new Set()
 
+    /* --- KODE LAMA ---
     for (let data of filtered) {
-      const title = data.item.snippet.title
-        .toLowerCase()
-        .replace(/\(.*?\)/g, "") // hapus (lyrics), (official), dll
+      const title = data.item.snippet.title.toLowerCase().replace(/\(.*?\)/g, "")
+      if (!seen.has(title)) { seen.add(title); unique.push(data) }
+    }
+    */
 
-      if (!seen.has(title)) {
-        seen.add(title)
-        unique.push(data)
-      }
+    // --- KODE BARU ---
+    for (let video of filtered) {
+      const title = video.title.toLowerCase().replace(/\(.*?\)/g, "")
+      if (!seen.has(title)) { seen.add(title); unique.push(video) }
     }
 
     // ==========================
     // 5. SHUFFLE + LIMIT
     // ==========================
+
+    /* --- KODE LAMA ---
     unique.sort(() => Math.random() - 0.5)
+    */
+
+    // --- KODE BARU (Acak Sempurna) ---
+    for (let i = unique.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [unique[i], unique[j]] = [unique[j], unique[i]];
+    }
 
     const finalItems = unique.slice(0, limit)
 
     // ==========================
     // 6. FORMAT OUTPUT
     // ==========================
+
+    /* --- KODE LAMA ---
     const songs = finalItems.map(({ item, durationData }) => {
       const videoId = item.id.videoId
-
       return {
         title: item.snippet.title,
         artist: item.snippet.channelTitle,
         album: "YouTube Music",
-        thumbnail:
-          item.snippet.thumbnails?.high?.url ||
-          item.snippet.thumbnails?.medium?.url ||
-          item.snippet.thumbnails?.default?.url,
+        thumbnail: item.snippet.thumbnails?.high?.url || item.snippet.thumbnails?.medium?.url || item.snippet.thumbnails?.default?.url,
         duration: durationData.formatted,
-        youtube_url: `https://www.youtube.com/watch?v=${videoId}`,
-        stream_url: `http://localhost:3000/stream?videoId=${videoId}`
+        youtube_url: \`https://www.youtube.com/watch?v=\${videoId}\`,
+        stream_url: \`http://localhost:3000/stream?videoId=\${videoId}\`
+      }
+    })
+    */
+
+    // --- KODE BARU ---
+    const songs = finalItems.map((video) => {
+      return {
+        title: video.title,
+        artist: video.author.name,
+        album: "YouTube Music",
+        thumbnail: video.thumbnail || video.image,
+        duration: video.duration.timestamp, 
+        youtube_url: video.url,
+        stream_url: `http://localhost:3000/stream?videoId=${video.videoId}`
       }
     })
 
@@ -185,11 +222,8 @@ app.get("/music", async (req, res) => {
     })
 
   } catch (err) {
-    console.log(err.response?.data || err.message)
-
-    res.status(500).json({
-      error: err.response?.data || err.message
-    })
+    console.log(err.message)
+    res.status(500).json({ error: err.message })
   }
 })
 
@@ -197,51 +231,26 @@ app.get("/music", async (req, res) => {
 // streaming audio
 // ==========================
 app.get("/stream", (req, res) => {
-
   const videoId = req.query.videoId
   const title = req.query.title
   const artist = req.query.artist
 
   let ytdlpArgs = [];
-
-  // Jika memiliki Id, stream video secara spesifik, jika tidak ya fallback search judul
   if (videoId) {
-    ytdlpArgs = [
-      `https://www.youtube.com/watch?v=${videoId}`,
-      "-f", "bestaudio",
-      "-o", "-"
-    ];
+    ytdlpArgs = [`https://www.youtube.com/watch?v=${videoId}`, "-f", "bestaudio", "-o", "-"];
   } else if (title && artist) {
-    const search = `${title} ${artist}`
-    ytdlpArgs = [
-      `ytsearch1:${search}`,
-      "-f", "bestaudio",
-      "-o", "-"
-    ];
+    ytdlpArgs = [`ytsearch1:${title} ${artist}`, "-f", "bestaudio", "-o", "-"];
   } else {
     return res.status(400).send("videoId or title and artist required")
   }
 
-  // const ytdlp = spawn("yt-dlp", ytdlpArgs)
   const ytdlp = spawn("C:/tools/yt-dlp/yt-dlp.exe", ytdlpArgs)
-
-  const ffmpeg = spawn("ffmpeg", [
-    "-i", "pipe:0",
-    "-f", "mp3",
-    "-"
-  ])
+  const ffmpeg = spawn("ffmpeg", ["-i", "pipe:0", "-f", "mp3", "-"])
 
   ytdlp.stdout.pipe(ffmpeg.stdin)
-
   ffmpeg.stdout.pipe(res)
-
 })
 
-// ==========================
-// run serverF
-// ==========================
 app.listen(3000, () => {
-
   console.log("YouTube Music API running on port 3000")
-
 })

@@ -3,6 +3,7 @@ import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 import '../player_page.dart';
 import '../services/audio_manager.dart';
 import '../utils/notification_helper.dart';
+import '../widgets/empty_state_widget.dart';
 
 class MPSearchScreen extends StatefulWidget {
   const MPSearchScreen({super.key});
@@ -17,6 +18,8 @@ class _MPSearchScreenState extends State<MPSearchScreen> {
   List<Video> _searchResults = [];
   bool _isLoading = false;
   String _searchQuery = "";
+  bool _hasError = false;
+  String _errorMessage = "";
 
   @override
   void dispose() {
@@ -31,6 +34,8 @@ class _MPSearchScreenState extends State<MPSearchScreen> {
       _isLoading = true;
       _searchQuery = query;
       _searchResults = [];
+      _hasError = false;
+      _errorMessage = "";
     });
 
     try {
@@ -56,10 +61,9 @@ class _MPSearchScreenState extends State<MPSearchScreen> {
       if (mounted) {
         setState(() {
           _isLoading = false;
+          _hasError = true;
+          _errorMessage = "Gagal memuat hasil pencarian. Periksa koneksi intenet Anda atau coba dengan kata kunci lain.";
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Gagal melakukan pencarian: $e')),
-        );
       }
     }
   }
@@ -194,35 +198,32 @@ class _MPSearchScreenState extends State<MPSearchScreen> {
                     ? const Center(
                         child: CircularProgressIndicator(color: accentGold),
                       )
-                    : _searchResults.isEmpty && _searchQuery.isNotEmpty
-                        ? Center(
-                            child: Text(
-                              "Tidak ada hasil untuk '$_searchQuery'",
-                              style: TextStyle(
-                                  color: Colors.white.withOpacity(0.8),
-                                  fontSize: 16),
-                            ),
+                    : _hasError
+                        ? MPEmptyStateWidget(
+                            icon: Icons.error_outline_rounded,
+                            title: "Pencarian Gagal",
+                            description: _errorMessage,
+                            buttonText: "Coba Lagi",
+                            onRetry: () => _performSearch(_searchQuery),
+                            iconColor: Colors.redAccent,
+                            textColor: textDark,
                           )
-                        : _searchResults.isEmpty
-                            ? Center(
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(Icons.search,
-                                        size: 70,
-                                        color: textDark.withOpacity(0.3)),
-                                    const SizedBox(height: 16),
-                                    Text(
-                                      "Temukan lagu favoritmu",
-                                      style: TextStyle(
-                                        color: textDark.withOpacity(0.6),
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ],
-                                ),
+                        : _searchResults.isEmpty && _searchQuery.isNotEmpty
+                            ? MPEmptyStateWidget(
+                                icon: Icons.search_off_rounded,
+                                title: "Tidak Ditemukan",
+                                description: "Kami tidak dapat menemukan lagu untuk '$_searchQuery'. Coba gunakan kata kunci lain.",
+                                iconColor: accentGold,
+                                textColor: textDark,
                               )
+                            : _searchResults.isEmpty
+                                ? MPEmptyStateWidget(
+                                    icon: Icons.search_rounded,
+                                    title: "Cari Lagu",
+                                    description: "Temukan lagu favoritmu di Famotion.",
+                                    iconColor: textDark.withOpacity(0.4),
+                                    textColor: textDark,
+                                  )
                             : ListView.builder(
                                 padding: const EdgeInsets.symmetric(
                                     horizontal: 20, vertical: 8),
@@ -253,6 +254,7 @@ class _MPSearchScreenState extends State<MPSearchScreen> {
               title: video.title,
               artist: _cleanArtistName(video.author, video.title),
               imageUrl: video.thumbnails.highResUrl,
+              durationMs: video.duration?.inMilliseconds,
             ),
           ),
         );

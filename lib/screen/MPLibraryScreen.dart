@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../services/playlist_manager.dart';
 
 class MPLibraryScreen extends StatelessWidget {
   const MPLibraryScreen({super.key});
@@ -63,16 +64,40 @@ class MPLibraryScreen extends StatelessWidget {
             
             // Playlists List
             Expanded(
-              child: ListView(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                physics: const BouncingScrollPhysics(),
-                children: [
-                  _buildPlaylistItem("Favorite Pop", "12 songs • Created by You", Icons.queue_music, const Color(0xFFD8A854)),
-                  _buildPlaylistItem("Relaxing Evening", "8 songs • Created by Famotion", Icons.nature, const Color(0xFF6A8A53)),
-                  _buildPlaylistItem("Workout Grind", "24 songs • Created by You", Icons.fitness_center, const Color(0xFFB57062)),
-                  _buildPlaylistItem("Upbeat Motivation", "15 songs • Created by Famotion", Icons.mood, const Color(0xFF729CA3)),
-                  _buildPlaylistItem("Sleep Sounds", "10 songs • Created by Famotion", Icons.nights_stay, const Color(0xFF5D668A)),
-                ],
+              child: ValueListenableBuilder<List<Map<String, dynamic>>>(
+                valueListenable: PlaylistManager.instance.likedSongsNotifier,
+                builder: (context, likedSongs, _) {
+                  return ValueListenableBuilder<Map<String, List<Map<String, dynamic>>>>(
+                    valueListenable: PlaylistManager.instance.playlistsNotifier,
+                    builder: (context, playlists, _) {
+                      final List<Widget> items = [];
+                      
+                      // Liked Songs Item
+                      items.add(_buildPlaylistItem(
+                        "Liked Songs", 
+                        "${likedSongs.length} songs", 
+                        Icons.favorite, 
+                        const Color(0xFFD8A854)
+                      ));
+                      
+                      // Custom Playlists Iteration
+                      playlists.forEach((name, tracks) {
+                        items.add(_buildPlaylistItem(
+                          name, 
+                          "${tracks.length} songs • Created by You", 
+                          Icons.queue_music, 
+                          const Color(0xFF6A8A53)
+                        ));
+                      });
+
+                      return ListView(
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        physics: const BouncingScrollPhysics(),
+                        children: items,
+                      );
+                    },
+                  );
+                },
               ),
             ),
           ],
