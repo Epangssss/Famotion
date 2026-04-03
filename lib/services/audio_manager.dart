@@ -26,8 +26,15 @@ class AudioManager {
       (state) {
         isPlayingNotifier.value = state.playing;
         if (state.processingState == ProcessingState.completed) {
-          isPlayingNotifier.value = false;
-          playNext();
+          final position = audioPlayer.position.inMilliseconds;
+          final duration = audioPlayer.duration?.inMilliseconds ?? 0;
+          
+          if (duration > 0 && position >= duration - 2000) {
+            isPlayingNotifier.value = false;
+            playNext();
+          } else {
+            isPlayingNotifier.value = false;
+          }
         }
       },
       onError: (Object e, StackTrace st) {
@@ -48,6 +55,7 @@ class AudioManager {
   final ValueNotifier<String?> titleNotifier = ValueNotifier<String?>(null);
   final ValueNotifier<String?> artistNotifier = ValueNotifier<String?>(null);
   final ValueNotifier<String?> imageUrlNotifier = ValueNotifier<String?>(null);
+  final ValueNotifier<int?> durationMsNotifier = ValueNotifier<int?>(null);
 
   // History stack for previous tracks
   final List<Map<String, dynamic>> _playbackHistory = [];
@@ -63,6 +71,7 @@ class AudioManager {
     required String title,
     required String artist,
     required String imageUrl,
+    int? durationMs,
     bool isFromHistory = false,
   }) async {
     final int requestId = ++_playRequestId;
@@ -84,6 +93,7 @@ class AudioManager {
           'title': titleNotifier.value,
           'artist': artistNotifier.value,
           'imageUrl': imageUrlNotifier.value,
+          'durationMs': durationMsNotifier.value,
         });
         if (_playbackHistory.length > 50) _playbackHistory.removeAt(0);
       }
@@ -92,6 +102,7 @@ class AudioManager {
       titleNotifier.value = title;
       artistNotifier.value = artist;
       imageUrlNotifier.value = imageUrl;
+      durationMsNotifier.value = durationMs;
       // Reset current index when explicitly playing a new search/dashboard song
       // (This will be overridden if playNext or playFromPlaylist is called)
       currentIndex = 0;
@@ -139,7 +150,18 @@ class AudioManager {
         'title': currentTitle,
         'artist': currentArtist,
         'imageUrl': currentImageUrl,
+        'durationMs': durationMsNotifier.value,
       });
+
+      int parseDuration(String? dur) {
+        if (dur == null || dur.isEmpty) return 0;
+        final p = dur.split(':');
+        try {
+          if (p.length == 2) return (int.parse(p[0]) * 60 + int.parse(p[1])) * 1000;
+          if (p.length == 3) return (int.parse(p[0]) * 3600 + int.parse(p[1]) * 60 + int.parse(p[2])) * 1000;
+        } catch (_) {}
+        return 0;
+      }
 
       for (var song in songs) {
         if (song['title'] == currentTitle) continue; // skip lagu yang sama
@@ -154,6 +176,7 @@ class AudioManager {
           'title': song['title'] ?? 'Unknown',
           'artist': song['artist'] ?? 'Unknown',
           'imageUrl': song['thumbnail'] ?? '',
+          'durationMs': parseDuration(song['duration']),
         });
       }
 
@@ -168,6 +191,7 @@ class AudioManager {
     required String title,
     required String artist,
     required String imageUrl,
+    int? durationMs,
   }) async {
     final int requestId = ++_playRequestId;
     try {
@@ -182,6 +206,7 @@ class AudioManager {
         title: title,
         artist: artist,
         imageUrl: imageUrl,
+        durationMs: durationMs,
       );
     } catch (e) {
       debugPrint("Failed to play youtube video: $e");
@@ -224,6 +249,7 @@ class AudioManager {
         title: track['title'] as String,
         artist: track['artist'] as String,
         imageUrl: track['imageUrl'] as String,
+        durationMs: track['durationMs'] as int?,
       );
     }
   }
@@ -246,6 +272,7 @@ class AudioManager {
       'title': prevTrack['title'],
       'artist': prevTrack['artist'],
       'imageUrl': prevTrack['imageUrl'],
+      'durationMs': prevTrack['durationMs'],
     });
     upcomingSongsNotifier.value = newUpcomingList;
     currentIndex = 0;
@@ -255,6 +282,7 @@ class AudioManager {
       title: prevTrack['title'] as String,
       artist: prevTrack['artist'] as String,
       imageUrl: prevTrack['imageUrl'] as String,
+      durationMs: prevTrack['durationMs'] as int?,
       isFromHistory: true, // prevents it from being added to history again
     );
   }

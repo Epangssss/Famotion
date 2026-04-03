@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:nb_utils/nb_utils.dart';
 import 'screen/MPSplashScreen.dart';
+import 'services/playlist_manager.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await initialize(); // from nb_utils
+  await PlaylistManager.instance.init();
   runApp(const MyApp());
 }
 

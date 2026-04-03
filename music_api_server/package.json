@@ -10,7 +10,8 @@
     "axios": "^1.7.7",
     "cors": "^2.8.6",
     "dotenv": "^17.3.1",
-    "express": "^4.22.1"
+    "express": "^4.22.1",
+    "yt-search": "^2.13.1"
   },
   "keywords": [],
   "author": "",
