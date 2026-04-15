@@ -32,7 +32,6 @@ class _MPAnalyticsScreenState extends State<MPAnalyticsScreen> {
   @override
   Widget build(BuildContext context) {
     const Color bgBottom = Color(0xFF1A2A14);
-    const Color textDark = Color(0xFF293B1F);
     
     // Hitung jumlah kemunculan per emosi
     Map<String, int> counts = {};

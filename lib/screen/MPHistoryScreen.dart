@@ -33,7 +33,6 @@ class _MPHistoryScreenState extends State<MPHistoryScreen> {
   @override
   Widget build(BuildContext context) {
     const Color bgBottom = Color(0xFF1A2A14);
-    const Color textDark = Color(0xFF293B1F);
 
     return Scaffold(
       backgroundColor: bgBottom,
