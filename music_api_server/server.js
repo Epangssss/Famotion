@@ -22,7 +22,13 @@ function getQueryList(emotion) {
     angry: ["Linkin Park", "Eminem", "hard rock", "Bring Me The Horizon", "Paramore", "Slipknot", "Rage Against The Machine", "System Of A Down", "Metallica", "Nirvana"],
   };
 
-  const emotionList = queries[emotion] || ["relaxing chill pop", "Ed Sheeran", "John Mayer", "acoustic", "lofi beats", "Daniel Caesar", "The Weeknd"];
+  const emotionKey = emotion?.toLowerCase() || "relax";
+  const emotionList = queries[emotionKey] || [
+    `best ${emotionKey} songs`,
+    `popular ${emotionKey} music`,
+    `${emotionKey} playlist`,
+    `${emotionKey} hits`
+  ];
 
   // --- KODE LAMA (Pilih 2 acak dengan sort biasa) ---
   // const shuffled = emotionList.sort(() => 0.5 - Math.random());
@@ -89,7 +95,7 @@ app.get("/music", async (req, res) => {
         const r = await ytSearch(q)
         const videos = r.videos.slice(0, 15) // Kita ambil 15 per kueri (dari 4 kueri acak)
         allItems = [...allItems, ...videos]
-      } catch(err) {
+      } catch (err) {
         console.error("Error dari yt-search:", q, err)
       }
     }
@@ -209,7 +215,7 @@ app.get("/music", async (req, res) => {
         artist: video.author.name,
         album: "YouTube Music",
         thumbnail: video.thumbnail || video.image,
-        duration: video.duration.timestamp, 
+        duration: video.duration.timestamp,
         youtube_url: video.url,
         stream_url: `http://localhost:3000/stream?videoId=${video.videoId}`
       }
@@ -251,6 +257,6 @@ app.get("/stream", (req, res) => {
   ffmpeg.stdout.pipe(res)
 })
 
-app.listen(3000, () => {
-  console.log("YouTube Music API running on port 3000")
+app.listen(2000, () => {
+  console.log("YouTube Music API running on port 2000")
 })

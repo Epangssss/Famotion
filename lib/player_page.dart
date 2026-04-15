@@ -6,6 +6,8 @@ import 'package:palette_generator/palette_generator.dart';
 import 'services/audio_manager.dart';
 import 'services/playlist_manager.dart';
 import 'utils/notification_helper.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:marquee/marquee.dart';
 
 class PlayerPage extends StatefulWidget {
   final String videoId;
@@ -30,7 +32,7 @@ class PlayerPage extends StatefulWidget {
 }
 
 class _PlayerPageState extends State<PlayerPage> {
-  final PageController _pageController = PageController(viewportFraction: 0.85); // Back to larger fraction for mobile mainly
+  final PageController _pageController = PageController(viewportFraction: 1.0); // Diubah ke 1.0 agar penuh
   bool _isPlaying = false;
   int _currentIndex = 0;
   double _volume = 1.0;
@@ -108,22 +110,27 @@ class _PlayerPageState extends State<PlayerPage> {
   }
 
   void _onPlayerStateChanged() {
-    if (mounted) {
-      setState(() {
-        _isPlaying = AudioManager.instance.isPlayingNotifier.value;
-        _volume = AudioManager.instance.audioPlayer.volume;
-      });
-    }
+    // Gunakan addPostFrameCallback agar setState tidak terpanggil saat build sedang berjalan
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        setState(() {
+          _isPlaying = AudioManager.instance.isPlayingNotifier.value;
+          _volume = AudioManager.instance.audioPlayer.volume;
+        });
+      }
+    });
   }
 
   void _onPlaylistChanged() {
-    if (mounted) {
-      setState(() {});
-      if (_currentIndex != 0 && _pageController.hasClients) {
-        _currentIndex = 0;
-        _pageController.jumpToPage(0);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        setState(() {});
+        if (_currentIndex != 0 && _pageController.hasClients) {
+          _currentIndex = 0;
+          _pageController.jumpToPage(0);
+        }
       }
-    }
+    });
   }
 
   Future<void> _playFromList(int index) async {
@@ -501,13 +508,13 @@ class _PlayerPageState extends State<PlayerPage> {
       );
     }
     
-    // Adjust height intelligently based on screen width/height for both desktop and mobile
-    final h = math.min(MediaQuery.of(context).size.width * 0.85, maxHeight);
+    // Sesuaikan padding agar ukuran gambar cukup (karena viewport 1.0)
+    final h = math.min(MediaQuery.of(context).size.width, maxHeight);
 
     return SizedBox(
       height: h,
       child: PageView.builder(
-        controller: _pageController, // using the 0.85 fraction viewport
+        controller: _pageController,
         itemCount: upcoming.length,
         onPageChanged: (index) {
           if (index != _currentIndex) {
@@ -516,49 +523,37 @@ class _PlayerPageState extends State<PlayerPage> {
         },
         itemBuilder: (context, index) {
           final track = upcoming[index];
-          return AnimatedBuilder(
-            animation: _pageController,
-            builder: (context, child) {
-              double value = 1.0;
-              if (_pageController.position.haveDimensions) {
-                value = _pageController.page! - index;
-                value = (1 - (value.abs() * 0.15)).clamp(0.85, 1.0);
-              }
-              // If desktop, apply extra manual shrinking so it doesn't look gigantic in the 0.85 viewport
-              final scaleMultiplier = MediaQuery.of(context).size.width > 600 ? mobileScale : 1.0;
-              
-              return Center(
-                child: Transform.scale(
-                  scale: value * scaleMultiplier,
-                  child: Container(
-                    margin: const EdgeInsets.symmetric(horizontal: 10),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(20),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.5),
-                          blurRadius: 30,
-                          offset: const Offset(0, 20),
-                        )
-                      ],
-                    ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(20),
-                      child: Image.network(
-                        track['imageUrl'] ?? '',
-                        width: double.infinity,
-                        height: double.infinity,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => Container(
-                          color: Colors.white10,
-                          child: const Icon(Icons.music_note, color: Colors.white54, size: 80),
-                        ),
-                      ),
-                    ),
+          
+          return Center(
+            child: Container(
+              margin: const EdgeInsets.symmetric(horizontal: 24),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(color: Colors.black.withOpacity(0.4), blurRadius: 20, offset: const Offset(0, 10))
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: CachedNetworkImage(
+                  key: ValueKey(track['imageUrl']),
+                  imageUrl: track['imageUrl'] ?? '',
+                  width: double.infinity,
+                  height: double.infinity,
+                  fit: BoxFit.cover,
+                  fadeInDuration: const Duration(milliseconds: 150), // Mempercepat efek loading
+                  memCacheWidth: 600, // Mempercepat cache di memori
+                  placeholder: (_, __) => Container(
+                    color: Colors.white10,
+                    child: const Center(child: CircularProgressIndicator(color: Colors.white24, strokeWidth: 2)),
+                  ),
+                  errorWidget: (_, __, ___) => Container(
+                    color: Colors.white10,
+                    child: const Icon(Icons.music_note, color: Colors.white54, size: 80),
                   ),
                 ),
-              );
-            },
+              ),
+            ),
           );
         },
       ),
@@ -724,12 +719,43 @@ class _PlayerPageState extends State<PlayerPage> {
               children: [
                 ValueListenableBuilder<String?>(
                   valueListenable: AudioManager.instance.titleNotifier,
-                  builder: (context, title, _) => Text(
-                    title ?? 'Loading...',
-                    style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
+                  builder: (context, title, _) {
+                    final songTitle = title ?? 'Loading...';
+                    // Text painter untuk mengukur lebar judul
+                    final TextPainter textPainter = TextPainter(
+                      text: TextSpan(text: songTitle, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                      textDirection: TextDirection.ltr,
+                      maxLines: 1,
+                    )..layout();
+
+                    // Jika kepanjangan, jadikan marquee yang bergerak
+                    if (textPainter.size.width > MediaQuery.of(context).size.width - 120) {
+                      return SizedBox(
+                        height: 30,
+                        child: Marquee(
+                          text: songTitle,
+                          style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
+                          scrollAxis: Axis.horizontal,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          blankSpace: 70.0,
+                          velocity: 30.0,
+                          pauseAfterRound: const Duration(seconds: 2),
+                          startPadding: 10.0,
+                          accelerationDuration: const Duration(seconds: 1),
+                          accelerationCurve: Curves.linear,
+                          decelerationDuration: const Duration(milliseconds: 500),
+                          decelerationCurve: Curves.easeOut,
+                        ),
+                      );
+                    } else {
+                      return Text(
+                        songTitle,
+                        style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      );
+                    }
+                  },
                 ),
                 const SizedBox(height: 4),
                 ValueListenableBuilder<String?>(
@@ -877,7 +903,7 @@ class _PlayerPageState extends State<PlayerPage> {
   }
 
   Widget _buildPlaybackControls(bool isMobile) {
-    double sizeMult = isMobile ? 1.4 : 1.0; 
+    double sizeMult = isMobile ? 1.15 : 1.0; // Diperkecil dari 1.4 agar tidak overflow di layar kecil
     
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
@@ -886,7 +912,7 @@ class _PlayerPageState extends State<PlayerPage> {
           icon: Icon(Icons.shuffle, color: Colors.white70, size: 24 * sizeMult),
           onPressed: () {},
         ),
-        SizedBox(width: isMobile ? 16 : 8),
+        SizedBox(width: isMobile ? 8 : 8),
         IconButton(
           icon: Icon(Icons.skip_previous, color: Colors.white, size: 36 * sizeMult),
           onPressed: () {
@@ -901,7 +927,7 @@ class _PlayerPageState extends State<PlayerPage> {
             final isLoading = processingState == ProcessingState.loading || processingState == ProcessingState.buffering;
 
             return Container(
-              margin: const EdgeInsets.symmetric(horizontal: 16),
+              margin: const EdgeInsets.symmetric(horizontal: 12),
               width: 56 * sizeMult,
               height: 56 * sizeMult,
               decoration: const BoxDecoration(
@@ -932,7 +958,7 @@ class _PlayerPageState extends State<PlayerPage> {
             AudioManager.instance.playNext();
           },
         ),
-        SizedBox(width: isMobile ? 16 : 8),
+        SizedBox(width: isMobile ? 8 : 8),
         StreamBuilder<LoopMode>(
           stream: AudioManager.instance.audioPlayer.loopModeStream,
           builder: (context, snapshot) {
@@ -1000,12 +1026,15 @@ class _PlayerPageState extends State<PlayerPage> {
                       children: [
                         ClipRRect(
                           borderRadius: BorderRadius.circular(4),
-                          child: Image.network(
-                            track['imageUrl'] ?? '',
+                          child: CachedNetworkImage(
+                            imageUrl: track['imageUrl'] ?? '',
                             width: 48,
                             height: 48,
                             fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => const Icon(Icons.music_note, color: Colors.white54, size: 24),
+                            placeholder: (_, __) => Container(
+                              width: 48, height: 48, color: Colors.white10,
+                            ),
+                            errorWidget: (_, __, ___) => const Icon(Icons.music_note, color: Colors.white54, size: 24),
                           ),
                         ),
                         const SizedBox(width: 16),
@@ -1036,6 +1065,34 @@ class _PlayerPageState extends State<PlayerPage> {
                 ),
               );
             },
+          )
+        else
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 32),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.05),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                children: [
+                  Icon(Icons.explore_outlined, color: Colors.white.withOpacity(0.3), size: 40),
+                  const SizedBox(height: 12),
+                  Text(
+                    "Belum ada rekomendasi",
+                    style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 15, fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    "Gunakan Face Mood 📸 atau cari lagu 🔍\nagar rekomendasi muncul otomatis!",
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.white.withOpacity(0.3), fontSize: 13),
+                  ),
+                ],
+              ),
+            ),
           ),
       ],
     );

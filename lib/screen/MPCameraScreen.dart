@@ -1,4 +1,8 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:camera/camera.dart';
+import 'package:http/http.dart' as http;
+import '../utils/auth_helper.dart';
 
 class MPCameraScreen extends StatefulWidget {
   const MPCameraScreen({super.key});
@@ -8,11 +12,103 @@ class MPCameraScreen extends StatefulWidget {
 }
 
 class _MPCameraScreenState extends State<MPCameraScreen> {
-  // Dalam real-world app, di sini inisialisasi CameraController
-  // Untuk mockup ini, kita tampilkan UI untuk simulasi deteksi emosi
-
+  CameraController? _controller;
   bool _isDetecting = false;
-  
+
+  @override
+  void initState() {
+    super.initState();
+    initCamera();
+  }
+
+  Future<void> initCamera() async {
+    try {
+      final cameras = await availableCameras();
+      if (cameras.isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Kamera tidak tersedia')),
+          );
+        }
+        return;
+      }
+
+      // Pilih kamera depan (selfie) untuk deteksi wajah
+      final frontCamera = cameras.firstWhere(
+        (cam) => cam.lensDirection == CameraLensDirection.front,
+        orElse: () => cameras[0],
+      );
+
+      _controller = CameraController(frontCamera, ResolutionPreset.medium);
+      await _controller!.initialize();
+
+      if (mounted) {
+        setState(() {});
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error inisialisasi kamera: $e')),
+        );
+      }
+    }
+  }
+
+  Future<Map<String, dynamic>> sendToModel(String path) async {
+    try {
+      var request = http.MultipartRequest(
+        'POST',
+        Uri.parse("http://$vpsIp:5000/predict"), // Memakai IP VPS dari settingan auth_helper
+      );
+
+      request.files.add(await http.MultipartFile.fromPath('file', path));
+
+      var response = await request.send();
+      var res = await http.Response.fromStream(response);
+
+      if (res.statusCode == 200) {
+        return jsonDecode(res.body);
+      } else {
+        return {"error": "Server error: ${res.statusCode}"};
+      }
+    } catch (e) {
+      return {"error": "Connection error: $e"};
+    }
+  }
+
+  Future<void> captureAndPredict() async {
+    if (_controller == null || !_controller!.value.isInitialized) return;
+
+    setState(() => _isDetecting = true);
+
+    try {
+      final image = await _controller!.takePicture();
+      var result = await sendToModel(image.path);
+
+      if (mounted) {
+        setState(() => _isDetecting = false);
+
+        if (result.containsKey("error")) {
+          _showErrorDialog(result["error"] ?? "Wajah tidak terdeteksi");
+          return;
+        }
+
+        _showResultDialog(result);
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isDetecting = false);
+        _showErrorDialog("Error: $e");
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller?.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     const Color bgTop = Color(0xFFDCE7CD);
@@ -25,18 +121,22 @@ class _MPCameraScreenState extends State<MPCameraScreen> {
       backgroundColor: bgBottom,
       body: Stack(
         children: [
-          // Background Gradient
-          Container(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [bgTop, bgMid, bgBottom],
-                stops: [0.0, 0.5, 1.0],
-              ),
-            ),
-          ),
-          
+          // Background or Camera Preview
+          _controller != null && _controller!.value.isInitialized
+              ? CameraPreview(_controller!)
+              : Container(
+                  decoration: const BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [bgTop, bgMid, bgBottom],
+                      stops: [0.0, 0.5, 1.0],
+                    ),
+                  ),
+                  child: const Center(
+                      child: CircularProgressIndicator(color: accentGold)),
+                ),
+
           SafeArea(
             child: Column(
               children: [
@@ -65,92 +165,18 @@ class _MPCameraScreenState extends State<MPCameraScreen> {
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-                      const SizedBox(width: 40), // Balance the close button
+                      const SizedBox(width: 40),
                     ],
                   ),
                 ),
-                
+
                 const Spacer(),
-                
-                // Camera View Finder Placeholder
-                Center(
-                  child: Container(
-                    width: 300,
-                    height: 400,
-                    decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.5),
-                      borderRadius: BorderRadius.circular(30),
-                      border: Border.all(color: accentGold, width: 2),
-                      boxShadow: [
-                        BoxShadow(
-                          color: accentGold.withOpacity(0.2),
-                          blurRadius: 20,
-                          spreadRadius: 5,
-                        ),
-                      ],
-                    ),
-                    child: Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        // Simulating face outline
-                        CustomPaint(
-                          size: const Size(200, 250),
-                          painter: FaceOutlinePainter(color: Colors.white.withOpacity(0.5)),
-                        ),
-                        
-                        if (_isDetecting)
-                          const CircularProgressIndicator(color: accentGold)
-                        else
-                          Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.face_retouching_natural, size: 80, color: Colors.white.withOpacity(0.7)),
-                              const SizedBox(height: 16),
-                              Text(
-                                "Posisikan wajah Anda\ndi dalam bingkai",
-                                textAlign: TextAlign.center,
-                                style: TextStyle(color: Colors.white.withOpacity(0.9), fontSize: 16),
-                              ),
-                            ],
-                          ),
-                          
-                        // Scanning animation effect overlay
-                        if (_isDetecting)
-                          Positioned(
-                            top: 0,
-                            bottom: 0,
-                            left: 0,
-                            right: 0,
-                            child: AnimatedContainer(
-                              duration: const Duration(seconds: 2),
-                              curve: Curves.easeInOut,
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(30),
-                                gradient: LinearGradient(
-                                  begin: Alignment.topCenter,
-                                  end: Alignment.bottomCenter,
-                                  colors: [
-                                    Colors.transparent,
-                                    accentGold.withOpacity(0.3),
-                                    Colors.transparent,
-                                  ],
-                                  stops: const [0.0, 0.5, 1.0],
-                                ),
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                ),
-                
-                const Spacer(),
-                
-                // Informational Text
+
+                // Info Text
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 40.0),
                   child: Text(
-                    "Aplikasi akan mendeteksi emosi Anda untuk memberikan rekomendasi musik yang tepat.",
+                    "Arahkan wajah Anda ke kamera untuk deteksi emosi",
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       color: Colors.white.withOpacity(0.8),
@@ -158,28 +184,12 @@ class _MPCameraScreenState extends State<MPCameraScreen> {
                     ),
                   ),
                 ),
-                
+
                 const SizedBox(height: 40),
-                
+
                 // Capture Button
                 GestureDetector(
-                  onTap: () {
-                    if (!_isDetecting) {
-                      setState(() {
-                        _isDetecting = true;
-                      });
-                      
-                      // Simulate scanning delay and then show result
-                      Future.delayed(const Duration(seconds: 3), () {
-                        if (mounted) {
-                          setState(() {
-                            _isDetecting = false;
-                          });
-                          _showResultDialog();
-                        }
-                      });
-                    }
-                  },
+                  onTap: _isDetecting ? null : captureAndPredict,
                   child: Container(
                     width: 80,
                     height: 80,
@@ -196,12 +206,15 @@ class _MPCameraScreenState extends State<MPCameraScreen> {
                           shape: BoxShape.circle,
                           color: Colors.white,
                         ),
-                        child: _isDetecting ? const Icon(Icons.stop, color: textDark, size: 30) : null,
+                        child: _isDetecting
+                            ? const CircularProgressIndicator(color: textDark)
+                            : const Icon(Icons.camera,
+                                color: textDark, size: 30),
                       ),
                     ),
                   ),
                 ),
-                
+
                 const SizedBox(height: 40),
               ],
             ),
@@ -211,106 +224,124 @@ class _MPCameraScreenState extends State<MPCameraScreen> {
     );
   }
 
-  void _showResultDialog() {
+  void _showErrorDialog(String message) {
     showDialog(
       context: context,
-      barrierDismissible: false,
       builder: (context) => AlertDialog(
         backgroundColor: const Color(0xFF293B1F),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Text(
-          "Hasil Deteksi",
+          "Oops!",
           textAlign: TextAlign.center,
           style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.sentiment_dissatisfied, size: 60, color: Color(0xFFD8A854)),
-            const SizedBox(height: 16),
-            const Text(
-              "Anda terlihat sedang galau/sedih.",
-              textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.white, fontSize: 16),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              "Kami akan menyiapkan playlist yang cocok untuk Anda.",
-              textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 14),
-            ),
-          ],
+        content: Text(
+          message,
+          textAlign: TextAlign.center,
+          style: const TextStyle(color: Colors.white),
         ),
         actions: [
           Center(
             child: ElevatedButton(
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFFD8A854),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
-                padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 12),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(30)),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 30, vertical: 12),
               ),
-              onPressed: () {
-                Navigator.pop(context); // Close dialog
-                Navigator.pop(context); // Back to dashboard
-              },
-              child: const Text("Lihat Rekomendasi", style: TextStyle(color: Colors.white)),
+              onPressed: () => Navigator.pop(context),
+              child: const Text("Coba Lagi",
+                  style: TextStyle(color: Colors.white)),
             ),
           ),
         ],
       ),
     );
   }
-}
 
-// Custom Painter for Face Outline
-class FaceOutlinePainter extends CustomPainter {
-  final Color color;
-  
-  FaceOutlinePainter({required this.color});
-  
-  @override
-  void paint(Canvas canvas, Size size) {
-    var paint = Paint()
-      ..color = color
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 3.0
-      ..strokeCap = StrokeCap.round;
-      
-    // Draw an oval representing an abstract face
-    var path = Path();
-    path.addOval(Rect.fromCenter(
-      center: Offset(size.width / 2, size.height / 2),
-      width: size.width * 0.8,
-      height: size.height,
-    ));
-    
-    // Draw crosshairs to help positioning
-    canvas.drawLine(
-      Offset(size.width / 2, size.height * 0.2), 
-      Offset(size.width / 2, size.height * 0.3), 
-      paint
-    );
-    canvas.drawLine(
-      Offset(size.width / 2, size.height * 0.7), 
-      Offset(size.width / 2, size.height * 0.8), 
-      paint
-    );
-    canvas.drawLine(
-      Offset(size.width * 0.2, size.height / 2), 
-      Offset(size.width * 0.3, size.height / 2), 
-      paint
-    );
-    canvas.drawLine(
-      Offset(size.width * 0.7, size.height / 2), 
-      Offset(size.width * 0.8, size.height / 2), 
-      paint
-    );
+  void _showResultDialog(Map<String, dynamic> result) {
+    // Find dominant emotion
+    String dominant = "Unknown";
+    double maxValue = 0;
 
-    canvas.drawPath(path, paint);
-  }
+    result.forEach((key, value) {
+      if (value is num && value > maxValue) {
+        maxValue = value.toDouble();
+        dominant = key;
+      }
+    });
 
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) {
-    return false;
+    // Build emotion display text
+    AuthHelper().saveEmotionStatus(dominant, maxValue);
+    String emotionText = result.entries
+        .where((e) => e.value is num)
+        .map((e) => "${e.key}: ${(e.value as num).toStringAsFixed(1)}%")
+        .join("\n");
+
+    // Genre dikendalikan di layar Dashboard, jadi hapus logika Dropdown di sini
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setStateDialog) {
+            return AlertDialog(
+              backgroundColor: const Color(0xFF293B1F),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              title: const Text(
+                "Hasil Deteksi",
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.sentiment_satisfied,
+                      size: 50, color: Color(0xFFD8A854)),
+                  const SizedBox(height: 12),
+                  Text(
+                    "Emosi Dominan: $dominant",
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    emotionText,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 13),
+                  ),
+                  // Dihapus: Pemilihan Genre dipindah sepenuhnya di Layar Utama (Dashboard).
+                ],
+              ),
+              actions: [
+                Center(
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFD8A854),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(30)),
+                      padding:
+                          const EdgeInsets.symmetric(horizontal: 30, vertical: 12),
+                    ),
+                    onPressed: () {
+                      Navigator.pop(context); // Tutup Dialognya
+                      Navigator.pop(context, dominant); // Kembalikan MOOD ke Dashboard (contoh: "happy")
+                    },
+                    child: const Text("Mainkan Musik",
+                        style: TextStyle(color: Colors.white)),
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
   }
 }

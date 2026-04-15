@@ -3,7 +3,8 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:nb_utils/nb_utils.dart';
 import 'MPLoginScreen.dart';
-import '../services/audio_manager.dart';
+import 'MPDashboardScreen.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 class MPSplashScreen extends StatefulWidget {
   const MPSplashScreen({Key? key}) : super(key: key);
@@ -46,32 +47,51 @@ class _MPSplashScreenState extends State<MPSplashScreen>
       }
     });
 
-    _playSplashMusic();
+    _initializeApp();
+  }
+
+  Future<void> _initializeApp() async {
+    // Safety timeout: jika permission hang, tetap pindah halaman setelah 6 detik
+    Future.delayed(const Duration(seconds: 6), () {
+      if (mounted) _goToLogin();
+    });
+
+    await _requestPermissions();
     _navigateToNext();
   }
 
-  Future<void> _playSplashMusic() async {
+  Future<void> _requestPermissions() async {
     try {
-      // Memutar suara chime singkat dari URL stabil saat splash screen dimulai.
-      final player = AudioManager.instance.audioPlayer;
-      await player.setUrl(
-          'https://cdn.pixabay.com/download/audio/2022/10/25/audio_145d2e3d36.mp3?filename=success-chime-104928.mp3');
-      await player.setVolume(1.0);
-      await player.play();
+      // Request required permissions dengan timeout
+      await Future.any([
+        [Permission.camera, Permission.microphone, Permission.storage].request(),
+        Future.delayed(const Duration(seconds: 3)),
+      ]);
     } catch (e) {
-      debugPrint("Could not play splash audio: $e");
+      debugPrint("Permission request error: $e");
     }
   }
 
   Future<void> _navigateToNext() async {
-    // Wait for splash duration 5 detik agar animasi dan lagu terasa.
-    await Future.delayed(const Duration(seconds: 5));
+    // Tunggu 3 detik agar animasi splash terasa
+    await Future.delayed(const Duration(seconds: 3));
     if (!mounted) return;
+    _goToLogin();
+  }
 
-    // Stop audio before navigating just in case
-    await AudioManager.instance.audioPlayer.stop();
-    MPLoginScreen().launch(context,
-        isNewTask: true, pageRouteAnimation: PageRouteAnimation.Fade);
+  void _goToLogin() {
+    if (!mounted) return;
+    
+    // Cek apakah user sudah login sebelumnya dengan membaca token dari device
+    String token = getStringAsync('userToken');
+    
+    if (token.isNotEmpty) {
+      DashboardPage().launch(context,
+          isNewTask: true, pageRouteAnimation: PageRouteAnimation.Fade);
+    } else {
+      MPLoginScreen().launch(context,
+          isNewTask: true, pageRouteAnimation: PageRouteAnimation.Fade);
+    }
   }
 
   @override
@@ -210,26 +230,14 @@ class _MPSplashScreenState extends State<MPSplashScreen>
                         child: Stack(
                           alignment: Alignment.center,
                           children: [
-                            // Echo rings radiating outward from icon
-                            ...List.generate(5, (i) {
-                              final phase = (t + i / 5.0) % 1.0;
-                              final ringRadius = 70.0 + phase * 140.0;
-                              final ringOpacity = (1.0 - phase) * 0.40;
-                              return SizedBox(
-                                width: ringRadius * 2,
-                                height: ringRadius * 2,
-                                child: DecoratedBox(
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    border: Border.all(
-                                      color: const Color(0xFFDCE7CD)
-                                          .withOpacity(ringOpacity),
-                                      width: 1.5,
-                                    ),
-                                  ),
-                                ),
-                              );
-                            }),
+                            // Echo rings radiating outward smoothly using CustomPaint
+                            SizedBox(
+                              width: 350,
+                              height: 350,
+                              child: CustomPaint(
+                                painter: _EchoRingsPainter(t),
+                              ),
+                            ),
                             // Icon circle itself
                             Transform.scale(
                               scale: pulse,
@@ -264,10 +272,9 @@ class _MPSplashScreenState extends State<MPSplashScreen>
                         duration: const Duration(milliseconds: 500),
                         transitionBuilder:
                             (Widget child, Animation<double> animation) {
-                          return FadeTransition(
-                              opacity: animation,
-                              child: ScaleTransition(
-                                  scale: animation, child: child));
+                          // Menggunakan FadeTransition murni untuk mencegah 
+                          // pixelation saat Flutter mencoba men-scale bitmap font (Icon) di Mode Release.
+                          return FadeTransition(opacity: animation, child: child);
                         },
                         child: Icon(
                           _emotions[_currentEmotionIndex],
@@ -498,4 +505,35 @@ class _ArcLoadingPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+// Smooth Anti-Aliased Echo Rings
+class _EchoRingsPainter extends CustomPainter {
+  final double progress;
+  _EchoRingsPainter(this.progress);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    
+    // Gunakan Paint dengan isAntiAlias true (bawaan) dan kualitas tinggi
+    final paint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.5
+      ..isAntiAlias = true;
+
+    for (int i = 0; i < 5; i++) {
+      final phase = (progress + i / 5.0) % 1.0;
+      final ringRadius = 70.0 + phase * 140.0;
+      final ringOpacity = (1.0 - phase) * 0.40;
+
+      paint.color = const Color(0xFFDCE7CD).withOpacity(ringOpacity);
+      canvas.drawCircle(center, ringRadius, paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _EchoRingsPainter oldDelegate) {
+    return oldDelegate.progress != progress;
+  }
 }
