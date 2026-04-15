@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:nb_utils/nb_utils.dart';
+import 'package:http/http.dart' as http;
+import '../utils/auth_helper.dart';
 
 class PlaylistManager {
   static final PlaylistManager instance = PlaylistManager._internal();
@@ -45,18 +47,76 @@ class PlaylistManager {
     }
   }
 
-  Future<void> _saveLikedSongs() async {
+  // --- Cloud Sync Methods ---
+
+  Future<void> syncFromCloud() async {
+    final String userId = getStringAsync('userId', defaultValue: "");
+    if (userId.isEmpty) return;
+
+    final url = Uri.parse(getBackendUrl('/api/playlist/$userId'));
+    try {
+      final response = await http.get(url);
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(response.body);
+        if (decoded != null) {
+          if (decoded['likedSongs'] != null) {
+            likedSongsNotifier.value = (decoded['likedSongs'] as List).cast<Map<String, dynamic>>();
+            await _saveLikedSongsLocalOnly();
+          }
+          if (decoded['playlists'] != null) {
+            final Map<String, dynamic> playlistsData = decoded['playlists'];
+            final Map<String, List<Map<String, dynamic>>> mapped = {};
+            playlistsData.forEach((key, value) {
+               mapped[key] = (value as List).cast<Map<String, dynamic>>();
+            });
+            playlistsNotifier.value = mapped;
+            await _savePlaylistsLocalOnly();
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint("Error fetching cloud playlist: $e");
+    }
+  }
+
+  Future<void> _backupToCloud() async {
+    final String userId = getStringAsync('userId', defaultValue: "");
+    if (userId.isEmpty) return;
+
+    final url = Uri.parse(getBackendUrl('/api/playlist/sync'));
+    try {
+      await http.post(url, headers: {'Content-Type': 'application/json'}, body: jsonEncode({
+          'userId': userId,
+          'likedSongs': likedSongsNotifier.value,
+          'playlists': playlistsNotifier.value,
+        }));
+    } catch (e) {
+      debugPrint("Error backup to cloud: $e");
+    }
+  }
+
+  // --- Local Save Methods ---
+
+  Future<void> _saveLikedSongsLocalOnly() async {
     final String data = jsonEncode(likedSongsNotifier.value);
     await setValue(_likedSongsKey, data);
-    // Trigger UI update properly
     likedSongsNotifier.value = List.from(likedSongsNotifier.value);
   }
 
-  Future<void> _savePlaylists() async {
+  Future<void> _savePlaylistsLocalOnly() async {
     final String data = jsonEncode(playlistsNotifier.value);
     await setValue(_playlistsKey, data);
-    // Trigger UI update properly
     playlistsNotifier.value = Map.from(playlistsNotifier.value);
+  }
+
+  Future<void> _saveLikedSongs() async {
+    await _saveLikedSongsLocalOnly();
+    _backupToCloud(); // Fire and forget (tanpa await agar aplikasi cepat)
+  }
+
+  Future<void> _savePlaylists() async {
+    await _savePlaylistsLocalOnly();
+    _backupToCloud(); // Fire and forget
   }
 
   // --- Liked Songs Methods ---

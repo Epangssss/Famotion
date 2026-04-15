@@ -3,8 +3,11 @@ import 'dart:math';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
+import 'package:just_audio_background/just_audio_background.dart';
+import '../utils/auth_helper.dart';
 
 class AudioManager {
   // Singleton pattern
@@ -66,6 +69,10 @@ class AudioManager {
   int currentIndex = 0;
   int _playRequestId = 0;
 
+  // Global queue preferences
+  String? currentQueueGenre;
+  String? currentQueueMood;
+
   Future<void> playMusic({
     required String audioUrl,
     required String title,
@@ -73,6 +80,8 @@ class AudioManager {
     required String imageUrl,
     int? durationMs,
     bool isFromHistory = false,
+    String? queueGenre,
+    String? queueMood,
   }) async {
     final int requestId = ++_playRequestId;
 
@@ -103,6 +112,19 @@ class AudioManager {
       artistNotifier.value = artist;
       imageUrlNotifier.value = imageUrl;
       durationMsNotifier.value = durationMs;
+      
+      // Update ui seketika agar gambar tidak nunggu rekomendasi selesai di-load
+      upcomingSongsNotifier.value = [
+        {
+          'videoId': '',
+           'audioUrl': audioUrl,
+          'title': title,
+          'artist': artist,
+          'imageUrl': imageUrl,
+          'durationMs': durationMs,
+        }
+      ];
+
       // Reset current index when explicitly playing a new search/dashboard song
       // (This will be overridden if playNext or playFromPlaylist is called)
       currentIndex = 0;
@@ -110,15 +132,50 @@ class AudioManager {
 
       if (_playRequestId != requestId) return;
       
-      // Removed audioPlayer.stop(); because setUrl implicitly does it.
-      // Calling stop() immediately followed by setUrl() crashes the Windows Media Foundation backend.
-      await audioPlayer.setUrl(audioUrl);
+      // Removed audioPlayer.stop() for Windows to prevent crash, BUT for Android (ExoPlayer),
+      // we MUST call stop() to immediately tear down the previous HTTP connection so the VPS
+      // is notified and kills the previous yt-dlp process.
+      if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) {
+        await audioPlayer.stop();
+      }
+      
+      debugPrint('🎵 Playing: $audioUrl');
+      
+      // Coba AudioSource.uri dulu (dengan headers), fallback ke setUrl biasa jika gagal
+      try {
+        await audioPlayer.setAudioSource(
+          AudioSource.uri(
+            Uri.parse(audioUrl),
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36',
+            },
+            tag: MediaItem(
+              id: audioUrl, // Unique ID
+              album: "Famotion",
+              title: title,
+              artist: artist,
+              artUri: Uri.parse(imageUrl),
+            ),
+          ),
+        );
+      } catch (sourceError) {
+        debugPrint('⚠️ setAudioSource gagal, fallback ke setUrl: $sourceError');
+        await audioPlayer.setUrl(audioUrl);
+      }
+      
+      // Update global queue preferences so it persists through the playlist
+      if (queueGenre != null) currentQueueGenre = queueGenre;
+      if (queueMood != null) currentQueueMood = queueMood;
       
       if (_playRequestId != requestId) return;
+      debugPrint('▶️ Starting playback...');
       await audioPlayer.play();
 
+      // Rekam jejak lagu ke Server Cloud
+      AuthHelper().saveListeningHistory(audioUrl, title, artist, imageUrl, durationMs ?? 0);
+
       // Fire and forget recommendation fetcher
-      // Gunakan backend api ketimbang youtube dart search agar lebih variatif
+      // Gunakan kombinasi Mood + Genre jika tersedia, kalau tidak, baru fallback acak.
       _fetchRecommendations(title, artist, imageUrl);
     } catch (e) {
       if (_playRequestId == requestId) {
@@ -130,12 +187,19 @@ class AudioManager {
   Future<void> _fetchRecommendations(
       String currentTitle, String currentArtist, String currentImageUrl) async {
     try {
-      // Pilih emotion secara acak supaya hasilnya selalu variatif dan tidak stuck 1 artis.
-      const emotions = ['happy', 'sad', 'stress', 'angry'];
-      final emotion = emotions[Random().nextInt(emotions.length)];
+      String queryPayload = '';
+      if (currentQueueMood != null && currentQueueMood!.isNotEmpty) {
+         queryPayload = currentQueueMood!;
+      } else {
+         const emotions = ['happy', 'sad', 'stress', 'angry'];
+         queryPayload = emotions[Random().nextInt(emotions.length)];
+      }
 
-      final String host = Platform.isAndroid ? '10.0.2.2' : 'localhost';
-      final uri = Uri.parse('http://$host:3000/music?emotion=$emotion&limit=25');
+      if (currentQueueGenre != null && currentQueueGenre!.isNotEmpty) {
+         queryPayload += ' ${currentQueueGenre!.toLowerCase()}';
+      }
+
+      final uri = Uri.parse(getMusicApiUrl('/music?q=$queryPayload&limit=25'));
       final response = await http.get(uri);
 
       if (response.statusCode != 200) return;
@@ -166,13 +230,10 @@ class AudioManager {
       for (var song in songs) {
         if (song['title'] == currentTitle) continue; // skip lagu yang sama
         final String streamUrl = song['stream_url'] ?? '';
-        // Ubah localhost ke 10.0.2.2 kalau running di Android
-        final String adjustedUrl = Platform.isAndroid
-            ? streamUrl.replaceAll('localhost', '10.0.2.2')
-            : streamUrl;
+        
         newUpcomingList.add({
           'videoId': '', // pakai audioUrl langsung, bukan re-fetch video id
-          'audioUrl': adjustedUrl,
+          'audioUrl': streamUrl,
           'title': song['title'] ?? 'Unknown',
           'artist': song['artist'] ?? 'Unknown',
           'imageUrl': song['thumbnail'] ?? '',
@@ -192,12 +253,13 @@ class AudioManager {
     required String artist,
     required String imageUrl,
     int? durationMs,
+    String? queueGenre,
+    String? queueMood,
   }) async {
     final int requestId = ++_playRequestId;
     try {
       // Menggunakan backend Node.js untuk bypass youtube_explode_dart error.
-      final String host = Platform.isAndroid ? '10.0.2.2' : 'localhost';
-      final String audioUrl = "http://$host:3000/stream?videoId=$videoId";
+      final String audioUrl = getMusicApiUrl('/stream?videoId=$videoId');
 
       if (_playRequestId != requestId) return;
 
@@ -207,6 +269,8 @@ class AudioManager {
         artist: artist,
         imageUrl: imageUrl,
         durationMs: durationMs,
+        queueGenre: queueGenre,
+        queueMood: queueMood,
       );
     } catch (e) {
       debugPrint("Failed to play youtube video: $e");
