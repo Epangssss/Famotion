@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import '../player_page.dart';
 import '../services/audio_manager.dart';
 import '../utils/notification_helper.dart';
+import '../utils/auth_helper.dart'; // import utitlity backend URL
 import '../widgets/empty_state_widget.dart';
 import 'MPSearchScreen.dart';
 import 'MPCameraScreen.dart';
@@ -61,7 +62,15 @@ class _DashboardPageState extends State<DashboardPage> {
     super.dispose();
   }
 
-  Future<void> _fetchMusic() async {
+  String _currentEmotion = "relax";
+  String _currentRootMood =
+      "relax"; // Mood murni tanpa artis/genre untuk antrean
+
+  Future<void> _fetchMusic({String? emotion}) async {
+    if (emotion != null) {
+      _currentEmotion = emotion;
+    }
+
     setState(() {
       _isLoading = true;
       _hasError = false;
@@ -69,8 +78,8 @@ class _DashboardPageState extends State<DashboardPage> {
     });
 
     try {
-      // 10.0.2.2 is local host for Android Emulators. Change to 'localhost' if running on desktop/web.
-      final response = await http.get(Uri.parse('http://10.0.2.2:3000/music'));
+      final url = Uri.parse(getMusicApiUrl('/music?q=$_currentEmotion'));
+      final response = await http.get(url);
 
       if (response.statusCode == 200) {
         if (mounted) {
@@ -87,51 +96,34 @@ class _DashboardPageState extends State<DashboardPage> {
           setState(() {
             _isLoading = false;
             _hasError = true;
-            _errorMessage = "Gagal memuat data dari server (${response.statusCode}).";
+            _errorMessage =
+                "Gagal memuat data dari server (${response.statusCode}).";
           });
         }
       }
     } catch (e) {
-      // Fallback for desktop/web
-      try {
-        final response = await http.get(Uri.parse('http://localhost:3000/music'));
-        if (response.statusCode == 200) {
-          if (mounted) {
-            setState(() {
-              var data = json.decode(response.body);
-              List<dynamic> songs = data['songs'] ?? [];
-              songs.shuffle();
-              _musicList = songs;
-              _isLoading = false;
-            });
-          }
-        } else {
-          if (mounted) {
-            setState(() {
-              _isLoading = false;
-              _hasError = true;
-              _errorMessage = "Gagal memuat data dari server lokal (${response.statusCode}).";
-            });
-          }
-        }
-      } catch (e2) {
-        if (mounted) {
-          setState(() {
-            _isLoading = false;
-            _hasError = true;
-            _errorMessage = "Koneksi ke server musik gagal. Pastikan server lokal berjalan.";
-          });
-        }
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _hasError = true;
+          _errorMessage =
+              "Koneksi ke server musik gagal. Pastikan server lokal berjalan.";
+        });
       }
     }
   }
 
   int _parseDuration(String? dur) {
-    if (dur == null || dur.trim().isEmpty || dur.trim().toLowerCase() == 'full') return 0;
+    if (dur == null || dur.trim().isEmpty || dur.trim().toLowerCase() == 'full')
+      return 0;
     final p = dur.split(':');
     try {
       if (p.length == 2) return (int.parse(p[0]) * 60 + int.parse(p[1])) * 1000;
-      if (p.length == 3) return (int.parse(p[0]) * 3600 + int.parse(p[1]) * 60 + int.parse(p[2])) * 1000;
+      if (p.length == 3)
+        return (int.parse(p[0]) * 3600 +
+                int.parse(p[1]) * 60 +
+                int.parse(p[2])) *
+            1000;
     } catch (_) {}
     return 0;
   }
@@ -146,9 +138,10 @@ class _DashboardPageState extends State<DashboardPage> {
   }) async {
     if (_isStartingPlayback) return;
     setState(() => _isStartingPlayback = true);
-    
+
     if (mounted) {
-      showSlidingInfoNotification(context, "Lagu akan segera diputar, mohon bersabar...");
+      showSlidingInfoNotification(
+          context, "Lagu akan segera diputar, mohon bersabar...");
     }
 
     try {
@@ -158,6 +151,8 @@ class _DashboardPageState extends State<DashboardPage> {
         artist: artist,
         imageUrl: imageUrl,
         durationMs: _parseDuration(durationStr),
+        queueGenre: _prefGenre,
+        queueMood: _currentRootMood,
       );
 
       if (navigate && mounted) {
@@ -186,6 +181,240 @@ class _DashboardPageState extends State<DashboardPage> {
         setState(() => _isStartingPlayback = false);
       }
     }
+  }
+
+  // Preferensi artis & genre yang dipilih user sebelum scan
+  String _prefArtist = '';
+  String _prefGenre = '';
+
+  void _showMoodSetupDialog(BuildContext context, Color accentGold) {
+    final artistController = TextEditingController(text: _prefArtist);
+    String selectedGenre = _prefGenre;
+
+    final genres = [
+      '',
+      'Pop',
+      'Rock',
+      'R&B',
+      'Hip Hop',
+      'Jazz',
+      'Lo-fi',
+      'Indie',
+      'EDM',
+      'Classical',
+      'Dangdut',
+      'K-Pop',
+      'Metal',
+    ];
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF1E2E17),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      isScrollControlled: true,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setSheetState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                left: 24,
+                right: 24,
+                top: 24,
+                bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Handle bar
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Colors.white24,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  const Text(
+                    "🎵 Preferensi Musik",
+                    style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    "Opsional — isi untuk rekomendasi yang lebih akurat!",
+                    style: TextStyle(
+                        color: Colors.white.withOpacity(0.5), fontSize: 13),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // Artis Field
+                  Text("Artis Favorit",
+                      style: TextStyle(
+                          color: Colors.white.withOpacity(0.7),
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: artistController,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: InputDecoration(
+                      hintText: "Contoh: Bruno Mars, Taylor Swift...",
+                      hintStyle:
+                          TextStyle(color: Colors.white.withOpacity(0.3)),
+                      prefixIcon: Icon(Icons.person_outline,
+                          color: Colors.white.withOpacity(0.4)),
+                      filled: true,
+                      fillColor: Colors.white.withOpacity(0.08),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: BorderSide.none,
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 14),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Genre Chips
+                  Text("Genre Lagu",
+                      style: TextStyle(
+                          color: Colors.white.withOpacity(0.7),
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: genres.where((g) => g.isNotEmpty).map((genre) {
+                      final isSelected = selectedGenre == genre;
+                      return GestureDetector(
+                        onTap: () {
+                          setSheetState(() {
+                            selectedGenre = isSelected ? '' : genre;
+                          });
+                        },
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: isSelected
+                                ? accentGold
+                                : Colors.white.withOpacity(0.08),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: isSelected
+                                  ? accentGold
+                                  : Colors.white.withOpacity(0.12),
+                            ),
+                          ),
+                          child: Text(
+                            genre,
+                            style: TextStyle(
+                              color: isSelected ? Colors.white : Colors.white70,
+                              fontSize: 13,
+                              fontWeight: isSelected
+                                  ? FontWeight.bold
+                                  : FontWeight.normal,
+                            ),
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 28),
+
+                  // Tombol Mulai Scan
+                  SizedBox(
+                    width: double.infinity,
+                    height: 52,
+                    child: ElevatedButton.icon(
+                      onPressed: () async {
+                        // Simpan preferensi
+                        _prefArtist = artistController.text.trim();
+                        _prefGenre = selectedGenre;
+                        Navigator.pop(ctx);
+
+                        // Buka kamera
+                        final detectedEmotion = await Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => const MPCameraScreen()),
+                        );
+
+                        // Gabungkan emosi + preferensi user untuk query yang lebih kaya
+                        if (detectedEmotion != null &&
+                            detectedEmotion is String) {
+                          _currentRootMood = detectedEmotion.toLowerCase();
+
+                          // Cari lagu awal berdasarkan MOOD + ARTIS
+                          String query = detectedEmotion.toLowerCase();
+                          if (_prefArtist.isNotEmpty) query += ' $_prefArtist';
+
+                          _fetchMusic(emotion: query);
+                        }
+                      },
+                      icon: const Icon(Icons.camera_alt_rounded,
+                          color: Colors.white),
+                      label: const Text(
+                        "Mulai Scan Wajah 📸",
+                        style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: accentGold,
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16)),
+                        elevation: 4,
+                      ),
+                    ),
+                  ),
+
+                  // Tombol Skip
+                  const SizedBox(height: 12),
+                  Center(
+                    child: TextButton(
+                      onPressed: () async {
+                        _prefArtist = '';
+                        _prefGenre = '';
+                        Navigator.pop(ctx);
+
+                        final detectedEmotion = await Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => const MPCameraScreen()),
+                        );
+
+                        if (detectedEmotion != null &&
+                            detectedEmotion is String) {
+                          _currentRootMood = detectedEmotion.toLowerCase();
+                          _fetchMusic(emotion: detectedEmotion.toLowerCase());
+                        }
+                      },
+                      child: Text(
+                        "Lewati, langsung scan saja →",
+                        style: TextStyle(
+                            color: Colors.white.withOpacity(0.4), fontSize: 13),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   @override
@@ -229,15 +458,7 @@ class _DashboardPageState extends State<DashboardPage> {
       ),
       // Bottom Navigation Bar with Center Camera FAB
       floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          // Navigasi ke Halaman Deteksi Emosi (Kamera)
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => const MPCameraScreen(),
-            ),
-          );
-        },
+        onPressed: () => _showMoodSetupDialog(context, accentGold),
         backgroundColor: accentGold,
         elevation: 8,
         shape: const CircleBorder(),
@@ -260,7 +481,7 @@ class _DashboardPageState extends State<DashboardPage> {
             _buildBottomNavItem(
                 Icons.home_filled, 'Home', _currentIndex == 0, 0),
             _buildBottomNavItem(
-                Icons.explore_outlined, 'Discover', _currentIndex == 1, 1),
+                Icons.insights_outlined, 'Mood', _currentIndex == 1, 1),
             const SizedBox(
                 width:
                     56), // Spasi yang lebih luas untuk tombol kamera di tengah
@@ -311,188 +532,189 @@ class _DashboardPageState extends State<DashboardPage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       // 1. Header (Right Aligned Profile)
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    Builder(builder: (context) {
-                      return GestureDetector(
-                        onTap: () {
-                          Scaffold.of(context).openEndDrawer();
-                        },
-                        child: CircleAvatar(
-                          radius: 18,
-                          backgroundColor: textDark.withOpacity(0.15),
-                          child: Icon(
-                            Icons.person,
-                            size: 20,
-                            color: textDark,
-                          ),
-                        ),
-                      );
-                    }),
-                  ],
-                ),
-                const SizedBox(height: 24),
-
-                // Search Bar (Navigasi ke MPSearchScreen)
-                GestureDetector(
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const MPSearchScreen(),
-                      ),
-                    );
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 14),
-                    decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.35),
-                        borderRadius: BorderRadius.circular(20),
-                        border:
-                            Border.all(color: Colors.white.withOpacity(0.5)),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.05),
-                            blurRadius: 10,
-                            offset: const Offset(0, 5),
-                          )
-                        ]),
-                    child: Row(
-                      children: [
-                        Icon(Icons.search,
-                            color: textDark.withOpacity(0.8), size: 24),
-                        const SizedBox(width: 12),
-                        Text(
-                          "Cari lagu, artis, atau album...",
-                          style: TextStyle(
-                            color: textDark.withOpacity(0.7),
-                            fontSize: 15,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 24),
-
-                // 2. Mood Result Card (Soft Gradient/Glassmorphism)
-                Container(
-                  width: double.infinity,
-                  padding:
-                      const EdgeInsets.symmetric(vertical: 32, horizontal: 20),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [cardGradientStart, cardGradientEnd],
-                    ),
-                    borderRadius: BorderRadius.circular(24),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.1),
-                        blurRadius: 15,
-                        offset: const Offset(0, 10),
-                      )
-                    ],
-                  ),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      Text(
-                        "Famotion",
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 26,
-                          fontWeight: FontWeight.bold,
-                          color: textBrown,
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                      // Mockup Emoticon / Logo Custom (Hati, Gelombang, & Daun)
-                      _buildCustomHeartLogo(
-                          const Color(0xFF556942), const Color(0xFFF9F6D6)),
-                      const SizedBox(height: 24),
-                      Text(
-                        "lagi galau dan bingung mau mendengarkan musik, mau mendengar hal baru?",
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontWeight: FontWeight.w800,
-                          fontSize: 16,
-                          color: textBrown.withOpacity(0.9),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        "Famotion hadir untuk menemukan mood musik yang tepat untuk perasaan anda.",
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: textBrown.withOpacity(0.8),
-                          fontSize: 14,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        "Analysis based on your activity and input.",
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: textBrown.withOpacity(0.6),
-                          fontSize: 11,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 32),
-
-                // 3. Section: Explore Recommendations
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      "EXPLORE RECOMMENDATIONS",
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 0.5,
-                        color: textDark,
-                      ),
-                    ),
-                    // Tombol Refresh
-                    GestureDetector(
-                      onTap: () {
-                        setState(() => _isLoading = true);
-                        _fetchMusic();
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: textDark.withOpacity(0.15),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.refresh_rounded, size: 14, color: textDark),
-                            const SizedBox(width: 4),
-                            Text(
-                              "Refresh",
-                              style: TextStyle(
-                                  fontSize: 11,
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          Builder(builder: (context) {
+                            return GestureDetector(
+                              onTap: () {
+                                Scaffold.of(context).openEndDrawer();
+                              },
+                              child: CircleAvatar(
+                                radius: 18,
+                                backgroundColor: textDark.withOpacity(0.15),
+                                child: Icon(
+                                  Icons.person,
+                                  size: 20,
                                   color: textDark,
-                                  fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                            );
+                          }),
+                        ],
+                      ),
+                      const SizedBox(height: 24),
+
+                      // Search Bar (Navigasi ke MPSearchScreen)
+                      GestureDetector(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const MPSearchScreen(),
+                            ),
+                          );
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 14),
+                          decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.35),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                  color: Colors.white.withOpacity(0.5)),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.05),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 5),
+                                )
+                              ]),
+                          child: Row(
+                            children: [
+                              Icon(Icons.search,
+                                  color: textDark.withOpacity(0.8), size: 24),
+                              const SizedBox(width: 12),
+                              Text(
+                                "Cari lagu, artis, atau album...",
+                                style: TextStyle(
+                                  color: textDark.withOpacity(0.7),
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+
+                      // 2. Mood Result Card (Soft Gradient/Glassmorphism)
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(
+                            vertical: 32, horizontal: 20),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [cardGradientStart, cardGradientEnd],
+                          ),
+                          borderRadius: BorderRadius.circular(24),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.1),
+                              blurRadius: 15,
+                              offset: const Offset(0, 10),
+                            )
+                          ],
+                        ),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            Text(
+                              "Famotion",
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 26,
+                                fontWeight: FontWeight.bold,
+                                color: textBrown,
+                              ),
+                            ),
+                            const SizedBox(height: 24),
+                            // Mockup Emoticon / Logo Custom (Hati, Gelombang, & Daun)
+                            _buildCustomHeartLogo(const Color(0xFF556942),
+                                const Color(0xFFF9F6D6)),
+                            const SizedBox(height: 24),
+                            Text(
+                              "lagi galau dan bingung mau mendengarkan musik, mau mendengar hal baru?",
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontWeight: FontWeight.w800,
+                                fontSize: 16,
+                                color: textBrown.withOpacity(0.9),
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              "Famotion hadir untuk menemukan mood musik yang tepat untuk perasaan anda.",
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: textBrown.withOpacity(0.8),
+                                fontSize: 14,
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            Text(
+                              "Analysis based on your activity and input.",
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: textBrown.withOpacity(0.6),
+                                fontSize: 11,
+                              ),
                             ),
                           ],
                         ),
                       ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
+                      const SizedBox(height: 32),
+
+                      // 3. Section: Explore Recommendations
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            "EXPLORE RECOMMENDATIONS",
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 0.5,
+                              color: textDark,
+                            ),
+                          ),
+                          // Tombol Refresh
+                          GestureDetector(
+                            onTap: () {
+                              setState(() => _isLoading = true);
+                              _fetchMusic();
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: textDark.withOpacity(0.15),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.refresh_rounded,
+                                      size: 14, color: textDark),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    "Refresh",
+                                    style: TextStyle(
+                                        fontSize: 11,
+                                        color: textDark,
+                                        fontWeight: FontWeight.bold),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
                     ],
                   ),
                 ),
@@ -526,54 +748,118 @@ class _DashboardPageState extends State<DashboardPage> {
                             textColor: textDark,
                           )
                         : _musicList.isEmpty
-                            ? MPEmptyStateWidget(
-                                icon: Icons.music_off_rounded,
-                                title: "Tidak Ada Rekomendasi",
-                                description: "Kami belum memiliki rekomendasi lagu untukmu saat ini.",
-                                buttonText: "Refresh",
-                                onRetry: _fetchMusic,
-                                iconColor: accentGold,
-                                textColor: textDark,
-                              )
-                        : SizedBox(
-                            height: 230,
-                            child: ScrollConfiguration(
-                              behavior: ScrollConfiguration.of(context).copyWith(
-                                dragDevices: {
-                                  PointerDeviceKind.touch,
-                                  PointerDeviceKind.mouse,
-                                },
-                              ),
-                              child: ListView.builder(
-                                scrollDirection: Axis.horizontal,
-                                physics: const BouncingScrollPhysics(),
-                                padding: const EdgeInsets.symmetric(horizontal: 20),
-                                clipBehavior: Clip.none,
-                                itemCount: _musicList.length > 20
-                                    ? 20
-                                    : _musicList.length,
-                                itemBuilder: (context, index) {
-                                final track = _musicList[index];
-                                final previewUrl = track['preview'];
-                                final streamUrl = track['stream_url'];
-                                final audioUrl = streamUrl ?? previewUrl;
-                                // Fallback if there's no preview url provided, though this disables playback
-                                return Padding(
-                                  padding: const EdgeInsets.only(right: 12.0),
-                                  child: _buildImageTrackCard(
-                                    track['title'] ?? 'Unknown',
-                                    track['artist'] ?? 'Unknown',
-                                    track['duration'] ??
-                                        'Full', // previously "Full"
-                                    track['thumbnail'] ??
-                                        'https://images.unsplash.com/photo-1518837695005-2083093ee35b?q=80&w=256&auto=format&fit=crop',
-                                    audioUrl,
+                            ? Padding(
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 20),
+                                child: Container(
+                                  width: double.infinity,
+                                  padding: const EdgeInsets.all(28),
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                      colors: [
+                                        accentGold.withOpacity(0.15),
+                                        accentGold.withOpacity(0.05),
+                                      ],
+                                    ),
+                                    borderRadius: BorderRadius.circular(20),
+                                    border: Border.all(
+                                        color: accentGold.withOpacity(0.2)),
                                   ),
-                                );
-                              },
-                            ), // ends ListView.builder
-                          ), // ends ScrollConfiguration
-                        ), // ends SizedBox
+                                  child: Column(
+                                    children: [
+                                      const Text("📸",
+                                          style: TextStyle(fontSize: 44)),
+                                      const SizedBox(height: 14),
+                                      const Text(
+                                        "Scan Wajahmu Dulu!",
+                                        style: TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 18,
+                                            fontWeight: FontWeight.bold),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        "Rekomendasi lagu akan muncul otomatis\nberdasarkan mood wajah kamu hari ini.",
+                                        textAlign: TextAlign.center,
+                                        style: TextStyle(
+                                            color:
+                                                Colors.white.withOpacity(0.5),
+                                            fontSize: 13),
+                                      ),
+                                      const SizedBox(height: 20),
+                                      SizedBox(
+                                        width: double.infinity,
+                                        height: 46,
+                                        child: ElevatedButton.icon(
+                                          onPressed: () => _showMoodSetupDialog(
+                                              context, accentGold),
+                                          icon: const Icon(
+                                              Icons.sentiment_satisfied_alt,
+                                              color: Colors.white,
+                                              size: 22),
+                                          label: const Text(
+                                            "Mulai Scan Mood",
+                                            style: TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 15,
+                                                fontWeight: FontWeight.bold),
+                                          ),
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: accentGold,
+                                            shape: RoundedRectangleBorder(
+                                                borderRadius:
+                                                    BorderRadius.circular(14)),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              )
+                            : SizedBox(
+                                height: 230,
+                                child: ScrollConfiguration(
+                                  behavior:
+                                      ScrollConfiguration.of(context).copyWith(
+                                    dragDevices: {
+                                      PointerDeviceKind.touch,
+                                      PointerDeviceKind.mouse,
+                                    },
+                                  ),
+                                  child: ListView.builder(
+                                    scrollDirection: Axis.horizontal,
+                                    physics: const BouncingScrollPhysics(),
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 20),
+                                    clipBehavior: Clip.none,
+                                    itemCount: _musicList.length > 20
+                                        ? 20
+                                        : _musicList.length,
+                                    itemBuilder: (context, index) {
+                                      final track = _musicList[index];
+                                      final previewUrl = track['preview'];
+                                      final streamUrl = track['stream_url'];
+                                      final audioUrl = streamUrl ?? previewUrl;
+                                      // Fallback if there's no preview url provided, though this disables playback
+                                      return Padding(
+                                        padding:
+                                            const EdgeInsets.only(right: 12.0),
+                                        child: _buildImageTrackCard(
+                                          track['title'] ?? 'Unknown',
+                                          track['artist'] ?? 'Unknown',
+                                          track['duration'] ??
+                                              'Full', // previously "Full"
+                                          track['thumbnail'] ??
+                                              'https://images.unsplash.com/photo-1518837695005-2083093ee35b?q=80&w=256&auto=format&fit=crop',
+                                          audioUrl,
+                                        ),
+                                      );
+                                    },
+                                  ), // ends ListView.builder
+                                ), // ends ScrollConfiguration
+                              ), // ends SizedBox
                 const SizedBox(height: 32),
 
                 Padding(
@@ -583,70 +869,72 @@ class _DashboardPageState extends State<DashboardPage> {
                     children: [
                       // 4. Section: For You
                       Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      "FOR YOU",
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 0.5,
-                        color: Colors.white70,
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            "FOR YOU",
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 0.5,
+                              color: Colors.white70,
+                            ),
+                          ),
+                          Icon(Icons.more_horiz,
+                              color: Colors.white.withOpacity(0.7)),
+                        ],
                       ),
-                    ),
-                    Icon(Icons.more_horiz,
-                        color: Colors.white.withOpacity(0.7)),
-                  ],
-                ),
-                const SizedBox(height: 16),
+                      const SizedBox(height: 16),
 
-                // Vertical List of Tracks
-                if (_isLoading)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 20.0),
-                    child: Center(
-                        child: CircularProgressIndicator(color: accentGold)),
-                  )
-                else if (_hasError)
-                  const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 20.0),
-                    child: Center(
-                        child: Text("Gagal memuat daftar lagu.",
-                            style: TextStyle(color: Colors.white54))),
-                  )
-                else if (_musicList.isEmpty)
-                  const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 20.0),
-                    child: Center(
-                        child: Text("No tracks available",
-                            style: TextStyle(color: Colors.white54))),
-                  )
-                else
-                  ..._musicList
-                      .skip(10)
-                      .take(20)
-                      .toList()
-                      .asMap()
-                      .entries
-                      .map((entry) {
-                    var track = entry.value;
-                    final previewUrl = track['preview'];
-                    final streamUrl = track['stream_url'];
-                    final audioUrl = streamUrl ?? previewUrl;
-                    bool isTrackPlaying = _currentlyPlayingUrl == audioUrl &&
-                        _isPlaying &&
-                        audioUrl != null;
+                      // Vertical List of Tracks
+                      if (_isLoading)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 20.0),
+                          child: Center(
+                              child:
+                                  CircularProgressIndicator(color: accentGold)),
+                        )
+                      else if (_hasError)
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 20.0),
+                          child: Center(
+                              child: Text("Gagal memuat daftar lagu.",
+                                  style: TextStyle(color: Colors.white54))),
+                        )
+                      else if (_musicList.isEmpty)
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 20.0),
+                          child: Center(
+                              child: Text("No tracks available",
+                                  style: TextStyle(color: Colors.white54))),
+                        )
+                      else
+                        ..._musicList
+                            .skip(10)
+                            .take(20)
+                            .toList()
+                            .asMap()
+                            .entries
+                            .map((entry) {
+                          var track = entry.value;
+                          final previewUrl = track['preview'];
+                          final streamUrl = track['stream_url'];
+                          final audioUrl = streamUrl ?? previewUrl;
+                          bool isTrackPlaying =
+                              _currentlyPlayingUrl == audioUrl &&
+                                  _isPlaying &&
+                                  audioUrl != null;
 
-                    return _buildPlaylistItem(
-                      track['title'] ?? 'Unknown',
-                      track['artist'] ?? 'Unknown',
-                      track['duration'] ?? 'Full',
-                      isTrackPlaying,
-                      track['thumbnail'] ??
-                          'https://images.unsplash.com/photo-1490730141103-6cac27aaab94?q=80&w=150&auto=format&fit=crop',
-                      audioUrl,
-                    );
-                  }),
+                          return _buildPlaylistItem(
+                            track['title'] ?? 'Unknown',
+                            track['artist'] ?? 'Unknown',
+                            track['duration'] ?? 'Full',
+                            isTrackPlaying,
+                            track['thumbnail'] ??
+                                'https://images.unsplash.com/photo-1490730141103-6cac27aaab94?q=80&w=150&auto=format&fit=crop',
+                            audioUrl,
+                          );
+                        }),
 
                       const SizedBox(height: 20),
                     ],
@@ -668,7 +956,8 @@ class _DashboardPageState extends State<DashboardPage> {
       valueListenable: AudioManager.instance.currentUrlNotifier,
       builder: (context, currentUrl, _) {
         // Hanya tampil jika ada lagu yang aktif
-        if (currentUrl == null || currentUrl.isEmpty) return const SizedBox.shrink();
+        if (currentUrl == null || currentUrl.isEmpty)
+          return const SizedBox.shrink();
 
         return ValueListenableBuilder<String?>(
           valueListenable: AudioManager.instance.titleNotifier,
@@ -698,7 +987,8 @@ class _DashboardPageState extends State<DashboardPage> {
                           },
                           child: Container(
                             margin: const EdgeInsets.fromLTRB(12, 0, 12, 8),
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 10),
                             decoration: BoxDecoration(
                               color: const Color(0xFF253B1D),
                               borderRadius: BorderRadius.circular(20),
@@ -725,25 +1015,30 @@ class _DashboardPageState extends State<DashboardPage> {
                                           width: 46,
                                           height: 46,
                                           fit: BoxFit.cover,
-                                          errorBuilder: (_, __, ___) => Container(
+                                          errorBuilder: (_, __, ___) =>
+                                              Container(
                                             width: 46,
                                             height: 46,
                                             color: Colors.white10,
-                                            child: const Icon(Icons.music_note, color: Colors.white54, size: 24),
+                                            child: const Icon(Icons.music_note,
+                                                color: Colors.white54,
+                                                size: 24),
                                           ),
                                         )
                                       : Container(
                                           width: 46,
                                           height: 46,
                                           color: Colors.white10,
-                                          child: const Icon(Icons.music_note, color: Colors.white54, size: 24),
+                                          child: const Icon(Icons.music_note,
+                                              color: Colors.white54, size: 24),
                                         ),
                                 ),
                                 const SizedBox(width: 12),
                                 // Title + Artist
                                 Expanded(
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
                                       Text(
@@ -772,7 +1067,9 @@ class _DashboardPageState extends State<DashboardPage> {
                                 // Play / Pause
                                 IconButton(
                                   icon: Icon(
-                                    isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                                    isPlaying
+                                        ? Icons.pause_rounded
+                                        : Icons.play_arrow_rounded,
                                     color: Colors.white,
                                     size: 28,
                                   ),
@@ -1017,7 +1314,8 @@ class _DashboardPageState extends State<DashboardPage> {
             children: [
               // Image placeholder
               ClipRRect(
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                borderRadius:
+                    const BorderRadius.vertical(top: Radius.circular(20)),
                 child: _ShimmerBox(width: 150, height: 150),
               ),
               const SizedBox(height: 10),
@@ -1226,12 +1524,12 @@ class _DashboardPageState extends State<DashboardPage> {
               if (isPlaying) ...[
                 const Icon(Icons.favorite_border,
                     color: Colors.white54, size: 20),
-                const SizedBox(width: 16),
+                const SizedBox(width: 8),
                 IconButton(
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
                   icon: Container(
-                    padding: const EdgeInsets.all(8),
+                    padding: const EdgeInsets.all(6),
                     decoration: const BoxDecoration(
                       shape: BoxShape.circle,
                       color: Color(0xFFD7A85C), // Accent Gold
@@ -1257,12 +1555,12 @@ class _DashboardPageState extends State<DashboardPage> {
                   Icons.more_horiz,
                   color: Colors.white.withOpacity(0.5),
                 ),
-                const SizedBox(width: 16),
+                const SizedBox(width: 8),
                 IconButton(
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
                   icon: Container(
-                    padding: const EdgeInsets.all(8),
+                    padding: const EdgeInsets.all(6),
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       color: Colors.white.withOpacity(0.1),
@@ -1450,14 +1748,16 @@ class _ShimmerBox extends StatefulWidget {
   State<_ShimmerBox> createState() => _ShimmerBoxState();
 }
 
-class _ShimmerBoxState extends State<_ShimmerBox> with SingleTickerProviderStateMixin {
+class _ShimmerBoxState extends State<_ShimmerBox>
+    with SingleTickerProviderStateMixin {
   late AnimationController _ctrl;
   late Animation<double> _anim;
 
   @override
   void initState() {
     super.initState();
-    _ctrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 900))
+    _ctrl = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 900))
       ..repeat(reverse: true);
     _anim = Tween<double>(begin: 0.2, end: 0.45).animate(
       CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut),

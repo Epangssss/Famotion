@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:nb_utils/nb_utils.dart';
+import '../utils/auth_helper.dart';
 
 class MPSignUpScreen extends StatefulWidget {
   const MPSignUpScreen({Key? key}) : super(key: key);
@@ -51,11 +52,15 @@ class _MPSignUpScreenState extends State<MPSignUpScreen> with SingleTickerProvid
     }
 
     setState(() => _isLoading = true);
-    await Future.delayed(const Duration(seconds: 1));
-    setState(() => _isLoading = false);
+    
+    await AuthHelper().registerWithEmail(
+      context,
+      name: nameController.text.trim(),
+      email: emailController.text.trim(),
+      password: passwordController.text.trim(),
+    );
 
-    toast('Account created! Please sign in.');
-    if (mounted) Navigator.pop(context);
+    setState(() => _isLoading = false);
   }
 
   @override
@@ -277,7 +282,10 @@ class _MPSignUpScreenState extends State<MPSignUpScreen> with SingleTickerProvid
 
                   // Google Sign Up
                   GestureDetector(
-                    onTap: () => toast('Google Sign Up coming soon!'),
+                    onTap: () async {
+                      toast('Sedang memproses Google Sign Up...');
+                      await AuthHelper().authWithGoogle(context, isSignUp: true);
+                    },
                     child: Container(
                       width: double.infinity,
                       padding: const EdgeInsets.symmetric(vertical: 14),
