@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:nb_utils/nb_utils.dart';
-import 'MPDashboardScreen.dart';
+import '../utils/auth_helper.dart';
 import 'MPSignUpScreen.dart';
-
 class MPLoginScreen extends StatefulWidget {
   const MPLoginScreen({Key? key}) : super(key: key);
 
@@ -91,7 +90,86 @@ class _MPLoginScreenState extends State<MPLoginScreen> {
               Align(
                 alignment: Alignment.centerRight,
                 child: Text('Forgot Password?', style: boldTextStyle(color: const Color(0xFF6A8A53), size: 14)).onTap(() {
-                  toast('Forgot Password Clicked');
+                  showDialog(
+                    context: context,
+                    builder: (BuildContext dialogContext) {
+                      final resetEmailCont = TextEditingController(text: emailController.text);
+                      final otpCont = TextEditingController();
+                      final newPassCont = TextEditingController();
+                      bool otpSent = false;
+                      bool isLoading = false;
+                      
+                      return StatefulBuilder(
+                        builder: (context, setStateDialog) {
+                          return AlertDialog(
+                            title: Text(otpSent ? 'Masukkan OTP & Sandi' : 'Reset Password'),
+                            content: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                TextFormField(
+                                  controller: resetEmailCont,
+                                  decoration: const InputDecoration(labelText: 'Email Terdaftar'),
+                                  enabled: !otpSent,
+                                ),
+                                if (otpSent) ...[
+                                  TextFormField(
+                                    controller: otpCont,
+                                    decoration: const InputDecoration(labelText: 'Kode OTP 4-Digit'),
+                                    keyboardType: TextInputType.number,
+                                  ),
+                                  TextFormField(
+                                    controller: newPassCont,
+                                    decoration: const InputDecoration(labelText: 'Sandi Baru'),
+                                    obscureText: true,
+                                  ),
+                                ]
+                              ],
+                            ),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(dialogContext),
+                                child: const Text('Batal'),
+                              ),
+                              ElevatedButton(
+                                onPressed: isLoading ? null : () async {
+                                  setStateDialog(() => isLoading = true);
+                                  
+                                  if (!otpSent) {
+                                    final email = resetEmailCont.text.trim();
+                                    if (email.isEmpty) {
+                                      toast('Harap isi Email');
+                                    } else {
+                                      final success = await AuthHelper().requestPasswordReset(context, email: email);
+                                      if (success) {
+                                        setStateDialog(() => otpSent = true);
+                                      }
+                                    }
+                                  } else {
+                                    final email = resetEmailCont.text.trim();
+                                    final otp = otpCont.text.trim();
+                                    final pass = newPassCont.text.trim();
+                                    if (otp.isEmpty || pass.isEmpty) {
+                                      toast('Isi OTP dan Sandi Baru');
+                                    } else {
+                                      final success = await AuthHelper().resetPassword(context, email: email, otp: otp, newPassword: pass);
+                                      if (success && context.mounted) {
+                                        Navigator.pop(dialogContext);
+                                      }
+                                    }
+                                  }
+                                  
+                                  setStateDialog(() => isLoading = false);
+                                },
+                                child: isLoading 
+                                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)) 
+                                  : Text(otpSent ? 'Simpan' : 'Kirim OTP (Cek Terminal Node.js)'),
+                              ),
+                            ],
+                          );
+                        }
+                      );
+                    },
+                  );
                 }),
               ),
               24.height,
@@ -111,7 +189,10 @@ class _MPLoginScreenState extends State<MPLoginScreen> {
 
               // Google Sign In
               GestureDetector(
-                onTap: () => toast('Google Sign In coming soon!'),
+                onTap: () async {
+                  toast('Sedang memproses Google Sign In...');
+                  await AuthHelper().authWithGoogle(context, isSignUp: false);
+                },
                 child: Container(
                   width: double.infinity,
                   padding: const EdgeInsets.symmetric(vertical: 14),
@@ -151,8 +232,16 @@ class _MPLoginScreenState extends State<MPLoginScreen> {
                 color: const Color(0xFFD8A854),
                 textColor: Colors.white,
                 shapeBorder: RoundedRectangleBorder(borderRadius: radius(16)),
-                onTap: () {
-                  DashboardPage().launch(context, isNewTask: true);
+                onTap: () async {
+                  if (emailController.text.trim().isEmpty || passwordController.text.trim().isEmpty) {
+                    toast('Isi email dan password terlebih dahulu');
+                    return;
+                  }
+                  await AuthHelper().loginWithEmail(
+                    context,
+                    email: emailController.text.trim(),
+                    password: passwordController.text.trim(),
+                  );
                 },
                 width: context.width(),
               ),
@@ -174,4 +263,5 @@ class _MPLoginScreenState extends State<MPLoginScreen> {
     );
   }
 }
+
 
