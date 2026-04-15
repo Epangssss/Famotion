@@ -1,4 +1,4 @@
-# facemoodemt
+# Famotion (Face Mood Trackng Music Recomendation)
 
 A new Flutter project.
 
