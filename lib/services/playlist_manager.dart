@@ -174,4 +174,11 @@ class PlaylistManager {
     playlistsNotifier.value[playlistName]?.removeWhere((t) => t['videoId'] == idOrUrl || t['audioUrl'] == idOrUrl);
     await _savePlaylists();
   }
+
+  Future<void> deletePlaylist(String name) async {
+    final current = Map<String, List<Map<String, dynamic>>>.from(playlistsNotifier.value);
+    current.remove(name);
+    playlistsNotifier.value = current;
+    await _savePlaylists();
+  }
 }

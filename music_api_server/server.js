@@ -22,23 +22,46 @@ function getQueryList(emotion) {
     angry: ["Linkin Park", "Eminem", "hard rock", "Bring Me The Horizon", "Paramore", "Slipknot", "Rage Against The Machine", "System Of A Down", "Metallica", "Nirvana"],
   };
 
-  const emotionKey = emotion?.toLowerCase() || "relax";
-  const emotionList = queries[emotionKey] || [
-    `best ${emotionKey} songs`,
-    `popular ${emotionKey} music`,
-    `${emotionKey} playlist`,
-    `${emotionKey} hits`
-  ];
+  const rawEmotion = emotion?.toLowerCase() || "relax";
+  
+  // Pisahkan root mood dan preferensi tambahan (genre/artist)
+  let baseEmotion = rawEmotion;
+  let suffix = "";
+  
+  for (const key of Object.keys(queries)) {
+    if (rawEmotion.startsWith(key)) {
+      baseEmotion = key;
+      suffix = rawEmotion.substring(key.length); // sisa string, misal " lo-fi"
+      break;
+    }
+  }
 
-  // --- KODE LAMA (Pilih 2 acak dengan sort biasa) ---
-  // const shuffled = emotionList.sort(() => 0.5 - Math.random());
-  // return shuffled.slice(0, 2).map(q => q + " music");
+  let emotionList = [];
+  
+  if (queries[baseEmotion]) {
+    // Kalau match dengan predefined (misal: "angry"), tambahkan suffix dari user
+    emotionList = queries[baseEmotion].map(q => q + suffix);
+  } else {
+    // Kalau custom (misal tidak terdeteksi baseEmotion), hindari keyword yang rancu (Angry Birds)
+    let safeKey = rawEmotion;
+    if (safeKey.includes("angry")) {
+        safeKey = safeKey.replace("angry", "angry mood");
+    }
+    
+    emotionList = [
+      `best ${safeKey} songs`,
+      `popular ${safeKey} music`,
+      `${safeKey} playlist`,
+      `${safeKey} hits`
+    ];
+  }
 
-  // --- KODE BARU (Pilih 4 acak dengan Fisher-Yates yang akurat) ---
+  // Acak list kueri
   for (let i = emotionList.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [emotionList[i], emotionList[j]] = [emotionList[j], emotionList[i]];
   }
+  
   return emotionList.slice(0, 4).map(q => q + " music");
 }
 
@@ -65,7 +88,7 @@ function parseDurationData(isoDuration) {
 // ==========================
 app.get("/music", async (req, res) => {
   try {
-    const emotion = req.query.emotion || "relax"
+    const emotion = req.query.emotion || req.query.q || "relax"
     const limit = parseInt(req.query.limit) || 50
 
     const queryList = getQueryList(emotion)

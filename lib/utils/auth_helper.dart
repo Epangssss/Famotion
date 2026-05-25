@@ -7,14 +7,14 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import '../services/playlist_manager.dart';
 
-const String vpsIp = '103.253.212.130'; // VPS Database and Python Server
+const String vpsIp = '103.247.11.142'; // VPS Database and Node.js Music Server
 
 String getBackendUrl(String endpoint) {
-  return 'http://$vpsIp:4000$endpoint';
+  return 'http://$vpsIp$endpoint';
 }
 
 String getMusicApiUrl(String endpoint) {
-  return 'http://$vpsIp:2000$endpoint';
+  return 'http://$vpsIp$endpoint';
 }
 
 class AuthHelper {
@@ -30,14 +30,14 @@ class AuthHelper {
       );
 
       // 1. Munculkan popup login Google
-      final gauth.GoogleSignInAccount? googleUser = await gauth.GoogleSignIn.instance.authenticate();
+      final gauth.GoogleSignInAccount googleUser = await gauth.GoogleSignIn.instance.authenticate();
       if (googleUser == null) {
         toast("Login dibatalkan");
         return; 
       }
 
       // 2. Dapatkan ID Token
-      final gauth.GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+      final gauth.GoogleSignInAuthentication googleAuth = googleUser.authentication;
       final String? idToken = googleAuth.idToken;
 
       toast('Berhasil masuk Google, memverifikasi ke server...');
