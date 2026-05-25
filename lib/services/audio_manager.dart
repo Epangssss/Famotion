@@ -2,7 +2,6 @@ import 'dart:io' show Platform;
 import 'dart:math';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
@@ -28,22 +27,65 @@ class AudioManager {
     audioPlayer.playerStateStream.listen(
       (state) {
         isPlayingNotifier.value = state.playing;
-        if (state.processingState == ProcessingState.completed) {
-          final position = audioPlayer.position.inMilliseconds;
-          final duration = audioPlayer.duration?.inMilliseconds ?? 0;
-          
-          if (duration > 0 && position >= duration - 2000) {
-            isPlayingNotifier.value = false;
-            playNext();
-          } else {
-            isPlayingNotifier.value = false;
-          }
-        }
+        // Kita tidak lagi memantau ProcessingState.completed di sini 
+        // karena ConcatenatingAudioSource otomatis pindah ke index berikutnya
       },
       onError: (Object e, StackTrace st) {
         debugPrint('Ignored player state error: $e');
       },
     );
+
+    // Pantau perubahan index dari just_audio (berjalan otomatis saat lagu habis, atau ditekan tombol next/prev di notifikasi)
+    audioPlayer.currentIndexStream.listen((index) {
+      if (index == null) return;
+      final sequence = audioPlayer.sequence;
+      if (sequence == null || index >= sequence.length) return;
+
+      final mediaItem = sequence[index].tag as MediaItem;
+
+      // Jika berpindah ke lagu baru (berdasarkan ID)
+      if (currentUrlNotifier.value != mediaItem.id) {
+        // 1. Masukkan lagu yang lama ke history
+        if (currentUrlNotifier.value != null && currentUrlNotifier.value!.isNotEmpty) {
+          _playbackHistory.add({
+            'audioUrl': currentUrlNotifier.value,
+            'title': titleNotifier.value,
+            'artist': artistNotifier.value,
+            'imageUrl': imageUrlNotifier.value,
+            'durationMs': durationMsNotifier.value,
+          });
+          if (_playbackHistory.length > 50) _playbackHistory.removeAt(0);
+        }
+
+        // 2. Perbarui state lagu saat ini
+        currentUrlNotifier.value = mediaItem.id;
+        titleNotifier.value = mediaItem.title;
+        artistNotifier.value = mediaItem.artist;
+        imageUrlNotifier.value = mediaItem.artUri?.toString();
+        // durationMs disimpan di extras saat membuat MediaItem
+        durationMsNotifier.value = mediaItem.extras?['durationMs'];
+
+        // 3. Perbarui daftar upcoming (memotong lagu-lagu sebelumnya dari antrean tampilan UI)
+        List<Map<String, dynamic>> newUpcoming = [];
+        for (int i = index; i < sequence.length; i++) {
+          final item = sequence[i].tag as MediaItem;
+          newUpcoming.add({
+            'audioUrl': item.id,
+            'title': item.title,
+            'artist': item.artist,
+            'imageUrl': item.artUri?.toString(),
+            'durationMs': item.extras?['durationMs'],
+            'videoId': '',
+          });
+        }
+        upcomingSongsNotifier.value = newUpcoming;
+
+        // 4. Jika sudah mendekati akhir antrean, fetch lebih banyak rekomendasi
+        if (index >= sequence.length - 2 && sequence.length > 1) {
+          _fetchRecommendations(mediaItem.title, mediaItem.artist ?? '', mediaItem.artUri?.toString() ?? '');
+        }
+      }
+    });
   }
 
   late final AudioPlayer audioPlayer;
@@ -68,10 +110,30 @@ class AudioManager {
       ValueNotifier<List<Map<String, dynamic>>>([]);
   int currentIndex = 0;
   int _playRequestId = 0;
+  bool _isPlayingNext = false; // guard agar completed tidak trigger dobel
 
   // Global queue preferences
   String? currentQueueGenre;
   String? currentQueueMood;
+
+  // Shuffle state
+  final ValueNotifier<bool> isShuffleNotifier = ValueNotifier<bool>(false);
+
+  void toggleShuffle() {
+    isShuffleNotifier.value = !isShuffleNotifier.value;
+    if (isShuffleNotifier.value) {
+      shuffleQueue();
+    }
+  }
+
+  void shuffleQueue() {
+    final upcoming = upcomingSongsNotifier.value;
+    if (upcoming.length <= 1) return;
+    final current = upcoming.first; // Pertahankan lagu yang sedang diputar di posisi 0
+    final rest = upcoming.sublist(1);
+    rest.shuffle();
+    upcomingSongsNotifier.value = [current, ...rest];
+  }
 
   Future<void> playMusic({
     required String audioUrl,
@@ -141,26 +203,51 @@ class AudioManager {
       
       debugPrint('🎵 Playing: $audioUrl');
       
-      // Coba AudioSource.uri dulu (dengan headers), fallback ke setUrl biasa jika gagal
-      try {
-        await audioPlayer.setAudioSource(
-          AudioSource.uri(
-            Uri.parse(audioUrl),
-            headers: {
-              'User-Agent': 'Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36',
-            },
-            tag: MediaItem(
-              id: audioUrl, // Unique ID
-              album: "Famotion",
-              title: title,
-              artist: artist,
-              artUri: Uri.parse(imageUrl),
-            ),
-          ),
+      // Deteksi asset lokal vs URL jaringan
+      final bool isLocalAsset = audioUrl.startsWith('assets/');
+
+      AudioSource createSource(String url, String t, String a, String img, int? dur) {
+        final mediaItem = MediaItem(
+          id: url,
+          album: "Famotion",
+          title: t,
+          artist: a,
+          artUri: Uri.tryParse(img),
+          extras: {'durationMs': dur},
         );
+        if (url.startsWith('assets/')) {
+          return AudioSource.asset(url, tag: mediaItem);
+        } else {
+          return AudioSource.uri(
+            Uri.parse(url),
+            headers: {'User-Agent': 'Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36'},
+            tag: mediaItem,
+          );
+        }
+      }
+
+      // Bangun playlist baru yang mencakup History dan lagu saat ini
+      List<AudioSource> playlistChildren = [];
+      
+      // Tambahkan history ke playlist agar tombol 'Previous' berfungsi natural
+      for (var prev in _playbackHistory) {
+        playlistChildren.add(createSource(
+            prev['audioUrl'], prev['title'], prev['artist'], prev['imageUrl'], prev['durationMs']));
+      }
+      
+      // Tambahkan lagu yang dipilih saat ini
+      playlistChildren.add(createSource(audioUrl, title, artist, imageUrl, durationMs));
+
+      final playlist = ConcatenatingAudioSource(
+        useLazyPreparation: true,
+        children: playlistChildren,
+      );
+      
+      try {
+        // Mainkan tepat di lagu yang baru saja ditambahkan (di akhir list history)
+        await audioPlayer.setAudioSource(playlist, initialIndex: playlistChildren.length - 1);
       } catch (sourceError) {
-        debugPrint('⚠️ setAudioSource gagal, fallback ke setUrl: $sourceError');
-        await audioPlayer.setUrl(audioUrl);
+        debugPrint('⚠️ setAudioSource gagal: $sourceError');
       }
       
       // Update global queue preferences so it persists through the playlist
@@ -187,19 +274,22 @@ class AudioManager {
   Future<void> _fetchRecommendations(
       String currentTitle, String currentArtist, String currentImageUrl) async {
     try {
-      String queryPayload = '';
+      String queryPayload;
+
       if (currentQueueMood != null && currentQueueMood!.isNotEmpty) {
-         queryPayload = currentQueueMood!;
+        // Mood dari Dashboard tersedia → gunakan mood + genre
+        queryPayload = currentQueueMood!;
+        if (currentQueueGenre != null && currentQueueGenre!.isNotEmpty) {
+          queryPayload += ' ${currentQueueGenre!.toLowerCase()}';
+        }
       } else {
-         const emotions = ['happy', 'sad', 'stress', 'angry'];
-         queryPayload = emotions[Random().nextInt(emotions.length)];
+        // Tidak ada mood (misalnya dari Search) → gunakan artis lagu yang sedang diputar
+        // Ini memastikan rekomendasi relevan dengan lagu yang dipilih user
+        queryPayload = currentArtist.isNotEmpty ? currentArtist : currentTitle;
       }
 
-      if (currentQueueGenre != null && currentQueueGenre!.isNotEmpty) {
-         queryPayload += ' ${currentQueueGenre!.toLowerCase()}';
-      }
-
-      final uri = Uri.parse(getMusicApiUrl('/music?q=$queryPayload&limit=25'));
+      final encodedPayload = Uri.encodeComponent(queryPayload);
+      final uri = Uri.parse(getMusicApiUrl('/music?q=$encodedPayload&limit=25'));
       final response = await http.get(uri);
 
       if (response.statusCode != 200) return;
@@ -241,7 +331,41 @@ class AudioManager {
         });
       }
 
+      // Shuffle lagu-lagu rekomendasi (kecuali lagu saat ini) agar pemutaran terasa dinamis
+      if (newUpcomingList.length > 1) {
+        final currentTrack = newUpcomingList.removeAt(0);
+        newUpcomingList.shuffle();
+        newUpcomingList.insert(0, currentTrack);
+      }
+
       upcomingSongsNotifier.value = newUpcomingList;
+
+      // Sisipkan lagu-lagu rekomendasi ini ke dalam pemutar musik agar bisa dimainkan otomatis
+      final currentPlaylist = audioPlayer.audioSource as ConcatenatingAudioSource?;
+      if (currentPlaylist != null) {
+        List<AudioSource> upcomingSources = [];
+        for (int i = 1; i < newUpcomingList.length; i++) {
+          final t = newUpcomingList[i];
+          final mediaItem = MediaItem(
+            id: t['audioUrl'],
+            album: "Famotion",
+            title: t['title'],
+            artist: t['artist'],
+            artUri: Uri.tryParse(t['imageUrl']),
+            extras: {'durationMs': t['durationMs']},
+          );
+          if ((t['audioUrl'] as String).startsWith('assets/')) {
+            upcomingSources.add(AudioSource.asset(t['audioUrl'], tag: mediaItem));
+          } else {
+            upcomingSources.add(AudioSource.uri(
+              Uri.parse(t['audioUrl']),
+              headers: {'User-Agent': 'Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36'},
+              tag: mediaItem,
+            ));
+          }
+        }
+        await currentPlaylist.addAll(upcomingSources);
+      }
     } catch (e) {
       debugPrint('Failed to fetch recommendations from backend: $e');
     }
@@ -278,77 +402,26 @@ class AudioManager {
   }
 
   Future<void> playNext() async {
-    final upcoming = upcomingSongsNotifier.value;
-    if (upcoming.length <= 1) return;
-
-    // Pilih lagu acak, excludes lagu yang sedang diputar (index 0 selalu current)
-    int randomIndex;
-    do {
-      randomIndex = 1 + Random().nextInt(upcoming.length - 1);
-    } while (randomIndex == currentIndex && upcoming.length > 2);
-
-    final track = upcoming[randomIndex];
-
-    // Update notifier langsung agar UI album art dll berubah seketika tanpa menunggu API
-    List<Map<String, dynamic>> newUpcomingList = List.from(upcoming);
-    newUpcomingList.removeAt(randomIndex);
-    newUpcomingList.insert(0, track);
-    upcomingSongsNotifier.value = newUpcomingList;
-    
-    // Index 0 adalah track yang baru dipilih
-    currentIndex = 0;
-
-    final videoId = track['videoId'] as String?;
-
-    if (videoId != null && videoId.isNotEmpty) {
-      await playYoutubeVideo(
-        videoId: videoId,
-        title: track['title'] as String,
-        artist: track['artist'] as String,
-        imageUrl: track['imageUrl'] as String,
-      );
-    } else if (track['audioUrl'] != null) {
-      await playMusic(
-        audioUrl: track['audioUrl'] as String,
-        title: track['title'] as String,
-        artist: track['artist'] as String,
-        imageUrl: track['imageUrl'] as String,
-        durationMs: track['durationMs'] as int?,
-      );
+    if (audioPlayer.hasNext) {
+      await audioPlayer.seekToNext();
+    } else {
+      // Jika queue kosong, fetch rekomendasi baru
+      await _fetchRecommendations(titleNotifier.value ?? '', artistNotifier.value ?? '', imageUrlNotifier.value ?? '');
+      if (audioPlayer.hasNext) {
+        await audioPlayer.seekToNext();
+      }
     }
   }
 
   Future<void> playPrevious() async {
-    // If audio has played for more than 3 seconds or no history, just seek to start
-    if (audioPlayer.position.inSeconds > 3 || _playbackHistory.isEmpty) {
+    // Jika lagu sudah berjalan lebih dari 3 detik, restart lagu tersebut
+    if (audioPlayer.position.inSeconds > 3) {
       await audioPlayer.seek(Duration.zero);
-      return;
+    } else if (audioPlayer.hasPrevious) {
+      await audioPlayer.seekToPrevious();
+    } else {
+      await audioPlayer.seek(Duration.zero);
     }
-
-    final prevTrack = _playbackHistory.removeLast();
-    
-    // UI update helper: re-insert it as index 0 in upcoming list so the view jumps smoothly
-    final upcoming = upcomingSongsNotifier.value;
-    List<Map<String, dynamic>> newUpcomingList = List.from(upcoming);
-    newUpcomingList.insert(0, {
-      'videoId': '', 
-      'audioUrl': prevTrack['audioUrl'],
-      'title': prevTrack['title'],
-      'artist': prevTrack['artist'],
-      'imageUrl': prevTrack['imageUrl'],
-      'durationMs': prevTrack['durationMs'],
-    });
-    upcomingSongsNotifier.value = newUpcomingList;
-    currentIndex = 0;
-
-    await playMusic(
-      audioUrl: prevTrack['audioUrl'] as String,
-      title: prevTrack['title'] as String,
-      artist: prevTrack['artist'] as String,
-      imageUrl: prevTrack['imageUrl'] as String,
-      durationMs: prevTrack['durationMs'] as int?,
-      isFromHistory: true, // prevents it from being added to history again
-    );
   }
 
   void dispose() {

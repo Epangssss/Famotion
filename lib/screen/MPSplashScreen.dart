@@ -7,7 +7,7 @@ import 'MPDashboardScreen.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 class MPSplashScreen extends StatefulWidget {
-  const MPSplashScreen({Key? key}) : super(key: key);
+  const MPSplashScreen({super.key});
 
   @override
   _MPSplashScreenState createState() => _MPSplashScreenState();
@@ -64,7 +64,7 @@ class _MPSplashScreenState extends State<MPSplashScreen>
     try {
       // Request required permissions dengan timeout
       await Future.any([
-        [Permission.camera, Permission.microphone, Permission.storage].request(),
+        [Permission.camera, Permission.storage].request(),
         Future.delayed(const Duration(seconds: 3)),
       ]);
     } catch (e) {

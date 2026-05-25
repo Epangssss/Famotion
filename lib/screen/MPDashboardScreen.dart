@@ -62,13 +62,31 @@ class _DashboardPageState extends State<DashboardPage> {
     super.dispose();
   }
 
-  String _currentEmotion = "relax";
-  String _currentRootMood =
-      "relax"; // Mood murni tanpa artis/genre untuk antrean
+  String _currentEmotion = "";
+  String _currentRootMood = ""; // Mood murni tanpa artis/genre untuk antrean
 
-  Future<void> _fetchMusic({String? emotion}) async {
+  // Genre yang aktif saat fetch (diset sebelum memanggil _fetchMusic)
+  String _fetchGenre = '';
+  String _fetchArtist = '';
+
+  Future<void> _fetchMusic({String? emotion, String? genre, String? artist}) async {
     if (emotion != null) {
       _currentEmotion = emotion;
+    }
+    if (genre != null) {
+      _fetchGenre = genre;
+    }
+    if (artist != null) {
+      _fetchArtist = artist;
+    }
+
+    if (_currentEmotion.isEmpty) {
+      setState(() {
+        _musicList = [];
+        _isLoading = false;
+        _hasError = false;
+      });
+      return;
     }
 
     setState(() {
@@ -78,7 +96,16 @@ class _DashboardPageState extends State<DashboardPage> {
     });
 
     try {
-      final url = Uri.parse(getMusicApiUrl('/music?q=$_currentEmotion'));
+      // Gunakan ?emotion= agar server masuk jalur rekomendasi berbasis emosi
+      // Tambahkan ?genre= agar Last.fm API diaktifkan di server
+      String endpoint = '/music?emotion=${Uri.encodeComponent(_currentEmotion)}';
+      if (_fetchGenre.isNotEmpty) {
+        endpoint += '&genre=${Uri.encodeComponent(_fetchGenre)}';
+      }
+      if (_fetchArtist.isNotEmpty) {
+        endpoint += '&artist=${Uri.encodeComponent(_fetchArtist)}';
+      }
+      final url = Uri.parse(getMusicApiUrl(endpoint));
       final response = await http.get(url);
 
       if (response.statusCode == 200) {
@@ -87,7 +114,9 @@ class _DashboardPageState extends State<DashboardPage> {
             var data = json.decode(response.body);
             List<dynamic> songs = data['songs'] ?? [];
             songs.shuffle();
-            _musicList = songs;
+            // Gabungkan local songs di depan list
+            final localSongs = _getLocalSongs(_currentEmotion);
+            _musicList = [...localSongs, ...songs];
             _isLoading = false;
           });
         }
@@ -103,27 +132,33 @@ class _DashboardPageState extends State<DashboardPage> {
       }
     } catch (e) {
       if (mounted) {
+        final localSongs = _getLocalSongs(_currentEmotion);
         setState(() {
           _isLoading = false;
-          _hasError = true;
+          _hasError = localSongs.isEmpty;
           _errorMessage =
-              "Koneksi ke server musik gagal. Pastikan server lokal berjalan.";
+              "Koneksi ke server musik gagal. Menampilkan lagu lokal saja.";
+          _musicList = localSongs;
         });
       }
     }
   }
 
   int _parseDuration(String? dur) {
-    if (dur == null || dur.trim().isEmpty || dur.trim().toLowerCase() == 'full')
+    if (dur == null ||
+        dur.trim().isEmpty ||
+        dur.trim().toLowerCase() == 'full') {
       return 0;
+    }
     final p = dur.split(':');
     try {
       if (p.length == 2) return (int.parse(p[0]) * 60 + int.parse(p[1])) * 1000;
-      if (p.length == 3)
+      if (p.length == 3) {
         return (int.parse(p[0]) * 3600 +
                 int.parse(p[1]) * 60 +
                 int.parse(p[2])) *
             1000;
+      }
     } catch (_) {}
     return 0;
   }
@@ -187,20 +222,139 @@ class _DashboardPageState extends State<DashboardPage> {
   String _prefArtist = '';
   String _prefGenre = '';
 
+  // ==============================
+  // LAGU LOKAL PER MOOD
+  // Tambahkan file MP3 ke assets/genre/Happy|Sad|Angry/
+  // Format nama: trackNN.mp3  (track01.mp3, track02.mp3, dst.)
+  // ==============================
+  static const String _localThumb = 'assets/images/Famotion.png';
+  static const Map<String, List<Map<String, dynamic>>> _moodLocalSongs = {
+    'happy': [
+      {
+        'title': 'Copland Appalachian Spring VII',
+        'artist': 'Aaron Copland',
+        'duration': 'Full',
+        'thumbnail': _localThumb,
+        'videoId': 'local_h1',
+        'stream_url': 'assets/genre/Happy/Aaron Copland, Aurora Orchestra, Nicholas Collon - Copland Appalachian Spring VII. Variations on a Shaker Hymn.Doppiomovimento(SPOTISAVER).mp3'
+      },
+      {
+        'title': 'Miracles',
+        'artist': 'Alexis Ffrench',
+        'duration': 'Full',
+        'thumbnail': _localThumb,
+        'videoId': 'local_h2',
+        'stream_url': 'assets/genre/Happy/Alexis Ffrench - Miracles (SPOTISAVER).mp3'
+      },
+      {
+        'title': 'La Gioconda Act 3 Dance Of The Hours',
+        'artist': 'Amilcare Ponchielli',
+        'duration': 'Full',
+        'thumbnail': _localThumb,
+        'videoId': 'local_h3',
+        'stream_url': 'assets/genre/Happy/Amilcare Ponchielli, Gothenburg Symphony Orchestra, Neeme Järvi - La Gioconda Act 3 Dance Of The Hours (SPOTISAVER).mp3'
+      },
+      {
+        'title': 'Concerto for 2 Mandolins in G Major',
+        'artist': 'Antonio Vivaldi',
+        'duration': 'Full',
+        'thumbnail': _localThumb,
+        'videoId': 'local_h4',
+        'stream_url': 'assets/genre/Happy/Antonio Vivaldi, James Tyler, Robin Jeffrey - Concerto for 2 Mandolins in G Major, RV 532 III.Allegro(SPOTISAVER).mp3'
+      },
+    ],
+    'sad': [
+      {
+        'title': 'A Thousand Years',
+        'artist': 'Unknown',
+        'duration': 'Full',
+        'thumbnail': _localThumb,
+        'videoId': 'local_s1',
+        'stream_url': 'assets/genre/Sad/compressed_A Thousand Years.mp3'
+      },
+      {
+        'title': 'All I Want',
+        'artist': 'High School Musical',
+        'duration': 'Full',
+        'thumbnail': _localThumb,
+        'videoId': 'local_s2',
+        'stream_url': 'assets/genre/Sad/compressed_All I Want - From _High School Musical_ The Musical_ The Series_.mp3'
+      },
+      {
+        'title': 'Anaheim',
+        'artist': 'Unknown',
+        'duration': 'Full',
+        'thumbnail': _localThumb,
+        'videoId': 'local_s3',
+        'stream_url': 'assets/genre/Sad/compressed_Anaheim.mp3'
+      },
+      {
+        'title': 'Atlantis',
+        'artist': 'Unknown',
+        'duration': 'Full',
+        'thumbnail': _localThumb,
+        'videoId': 'local_s4',
+        'stream_url': 'assets/genre/Sad/compressed_Atlantis.mp3'
+      },
+    ],
+    'angry': [
+      {
+        'title': 'A Little Bit Off',
+        'artist': 'spotdown.org',
+        'duration': 'Full',
+        'thumbnail': _localThumb,
+        'videoId': 'local_a1',
+        'stream_url': 'assets/genre/Angry/_A Little Bit Off_spotdown.org.mp3'
+      },
+      {
+        'title': 'AURA - Super Slowed + Reverb',
+        'artist': 'Unknown',
+        'duration': 'Full',
+        'thumbnail': _localThumb,
+        'videoId': 'local_a2',
+        'stream_url': 'assets/genre/Angry/_AURA - Super Slowed + Reverb.mp3'
+      },
+      {
+        'title': 'Addicted',
+        'artist': 'spotdown.org',
+        'duration': 'Full',
+        'thumbnail': _localThumb,
+        'videoId': 'local_a3',
+        'stream_url': 'assets/genre/Angry/_Addicted_spotdown.org.mp3'
+      },
+      {
+        'title': 'Áurea cósmica',
+        'artist': 'Unknown',
+        'duration': 'Full',
+        'thumbnail': _localThumb,
+        'videoId': 'local_a4',
+        'stream_url': 'assets/genre/Angry/_Áurea cósmica - Japanese Version [Super Slowed].mp3'
+      },
+    ],
+  };
+
+  /// Ambil local songs yang cocok dengan base mood
+  List<Map<String, dynamic>> _getLocalSongs(String emotion) {
+    final base = emotion.toLowerCase();
+    for (final key in _moodLocalSongs.keys) {
+      if (base.startsWith(key)) return List.from(_moodLocalSongs[key]!);
+    }
+    return [];
+  }
+
   void _showMoodSetupDialog(BuildContext context, Color accentGold) {
     final artistController = TextEditingController(text: _prefArtist);
     String selectedGenre = _prefGenre;
 
     final genres = [
-      '',
+      'Phonk',
       'Pop',
       'Rock',
-      'R&B',
       'Hip Hop',
       'Jazz',
       'Lo-fi',
       'Indie',
-      'EDM',
+      'Chill',
       'Classical',
       'Dangdut',
       'K-Pop',
@@ -224,11 +378,12 @@ class _DashboardPageState extends State<DashboardPage> {
                 top: 24,
                 bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
               ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Handle bar
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Handle bar
                   Center(
                     child: Container(
                       width: 40,
@@ -262,24 +417,94 @@ class _DashboardPageState extends State<DashboardPage> {
                           fontSize: 13,
                           fontWeight: FontWeight.w600)),
                   const SizedBox(height: 8),
-                  TextField(
-                    controller: artistController,
-                    style: const TextStyle(color: Colors.white),
-                    decoration: InputDecoration(
-                      hintText: "Contoh: Bruno Mars, Taylor Swift...",
-                      hintStyle:
-                          TextStyle(color: Colors.white.withOpacity(0.3)),
-                      prefixIcon: Icon(Icons.person_outline,
-                          color: Colors.white.withOpacity(0.4)),
-                      filled: true,
-                      fillColor: Colors.white.withOpacity(0.08),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(14),
-                        borderSide: BorderSide.none,
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 14),
-                    ),
+                  Autocomplete<String>(
+                    initialValue: TextEditingValue(text: _prefArtist),
+                    optionsBuilder: (TextEditingValue textEditingValue) async {
+                      if (textEditingValue.text.isEmpty) {
+                        return const Iterable<String>.empty();
+                      }
+                      try {
+                        final url = Uri.parse("http://ws.audioscrobbler.com/2.0/?method=artist.search&artist=${Uri.encodeComponent(textEditingValue.text)}&api_key=beea2c2cffc0d4d39c6466e16611d20d&format=json&limit=5");
+                        final response = await http.get(url);
+                        if (response.statusCode == 200) {
+                          final data = json.decode(response.body);
+                          final artists = data['results']['artistmatches']['artist'] as List;
+                          return artists.map((a) => a['name'] as String).toList();
+                        }
+                      } catch (e) {
+                        debugPrint("Autocomplete error: $e");
+                      }
+                      return const Iterable<String>.empty();
+                    },
+                    onSelected: (String selection) {
+                      artistController.text = selection;
+                    },
+                    fieldViewBuilder: (context, controller, focusNode, onEditingComplete) {
+                      // Sync local controller to the outer artistController used for submit
+                      controller.addListener(() {
+                        artistController.text = controller.text;
+                      });
+                      return TextField(
+                        controller: controller,
+                        focusNode: focusNode,
+                        style: const TextStyle(color: Colors.white),
+                        decoration: InputDecoration(
+                          hintText: "Contoh: Bruno Mars, Taylor Swift...",
+                          hintStyle: TextStyle(color: Colors.white.withOpacity(0.3)),
+                          prefixIcon: Icon(Icons.search, color: Colors.white.withOpacity(0.4)),
+                          filled: true,
+                          fillColor: Colors.white.withOpacity(0.08),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: BorderSide.none,
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                        ),
+                      );
+                    },
+                    optionsViewBuilder: (context, onSelected, options) {
+                      return Align(
+                        alignment: Alignment.topLeft,
+                        child: Material(
+                          elevation: 4.0,
+                          color: const Color(0xFF293B1F),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            side: BorderSide(color: Colors.white.withOpacity(0.1)),
+                          ),
+                          child: SizedBox(
+                            width: MediaQuery.of(context).size.width - 48,
+                            child: ListView.separated(
+                              padding: EdgeInsets.zero,
+                              shrinkWrap: true,
+                              itemCount: options.length,
+                              separatorBuilder: (context, index) => Divider(height: 1, color: Colors.white.withOpacity(0.1)),
+                              itemBuilder: (BuildContext context, int index) {
+                                final String option = options.elementAt(index);
+                                return InkWell(
+                                  onTap: () => onSelected(option),
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                                    child: Row(
+                                      children: [
+                                        Icon(Icons.person, color: accentGold.withOpacity(0.8), size: 20),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: Text(
+                                            option,
+                                            style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w500),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        ),
+                      );
+                    },
                   ),
                   const SizedBox(height: 20),
 
@@ -355,11 +580,13 @@ class _DashboardPageState extends State<DashboardPage> {
                             detectedEmotion is String) {
                           _currentRootMood = detectedEmotion.toLowerCase();
 
-                          // Cari lagu awal berdasarkan MOOD + ARTIS
-                          String query = detectedEmotion.toLowerCase();
-                          if (_prefArtist.isNotEmpty) query += ' $_prefArtist';
-
-                          _fetchMusic(emotion: query);
+                          // Kirim emotion & genre sebagai parameter TERPISAH
+                          // agar server menggunakan Last.fm API untuk genre
+                          _fetchMusic(
+                            emotion: detectedEmotion.toLowerCase(),
+                            genre: _prefGenre, // dikirim sebagai ?genre=
+                            artist: _prefArtist, // dikirim sebagai ?artist=
+                          );
                         }
                       },
                       icon: const Icon(Icons.camera_alt_rounded,
@@ -398,7 +625,11 @@ class _DashboardPageState extends State<DashboardPage> {
                         if (detectedEmotion != null &&
                             detectedEmotion is String) {
                           _currentRootMood = detectedEmotion.toLowerCase();
-                          _fetchMusic(emotion: detectedEmotion.toLowerCase());
+                          _fetchMusic(
+                            emotion: detectedEmotion.toLowerCase(),
+                            genre: '',
+                            artist: '',
+                          );
                         }
                       },
                       child: Text(
@@ -409,6 +640,7 @@ class _DashboardPageState extends State<DashboardPage> {
                     ),
                   ),
                 ],
+              ),
               ),
             );
           },
@@ -430,7 +662,7 @@ class _DashboardPageState extends State<DashboardPage> {
     const Color accentGold = Color(0xFFD8A854);
 
     // Daftar layar yang akan ditampilkan sesuai index Bottom Navigation
-    final List<Widget> _screens = [
+    final List<Widget> screens = [
       _buildHomeContent(bgTop, bgMid, bgBottom, cardGradientStart,
           cardGradientEnd, textDark, textBrown, accentGold),
       const MPDiscoverScreen(),
@@ -445,7 +677,7 @@ class _DashboardPageState extends State<DashboardPage> {
         children: [
           IndexedStack(
             index: _currentIndex,
-            children: _screens,
+            children: screens,
           ),
           // Mini Player — tampil di atas Bottom Nav saat ada lagu yang diputar
           Positioned(
@@ -473,8 +705,9 @@ class _DashboardPageState extends State<DashboardPage> {
         color: const Color(0xFF1E2E17),
         shape: const CircularNotchedRectangle(),
         notchMargin: 8.0,
-        height: 85, // Ditinggikan sedikit untuk menghindari overflow
-        padding: const EdgeInsets.symmetric(horizontal: 8.0),
+        // Dihapus 'height: 85' karena membuat overflow saat font hp dibesarkan. 
+        // Menggunakan padding vertikal agar fleksibel menyesuaikan layar.
+        padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 12.0),
         child: Row(
           mainAxisSize: MainAxisSize.max,
           children: [
@@ -543,11 +776,8 @@ class _DashboardPageState extends State<DashboardPage> {
                               child: CircleAvatar(
                                 radius: 18,
                                 backgroundColor: textDark.withOpacity(0.15),
-                                child: Icon(
-                                  Icons.person,
-                                  size: 20,
-                                  color: textDark,
-                                ),
+                                backgroundImage: const AssetImage(
+                                    'assets/images/Famotion.png'),
                               ),
                             );
                           }),
@@ -723,7 +953,7 @@ class _DashboardPageState extends State<DashboardPage> {
                 _isLoading
                     // Shimmer skeleton loading cards
                     ? SizedBox(
-                        height: 230,
+                        height: 245,
                         child: ListView.builder(
                           scrollDirection: Axis.horizontal,
                           physics: const NeverScrollableScrollPhysics(),
@@ -819,7 +1049,7 @@ class _DashboardPageState extends State<DashboardPage> {
                                 ),
                               )
                             : SizedBox(
-                                height: 230,
+                                height: 245,
                                 child: ScrollConfiguration(
                                   behavior:
                                       ScrollConfiguration.of(context).copyWith(
@@ -956,8 +1186,9 @@ class _DashboardPageState extends State<DashboardPage> {
       valueListenable: AudioManager.instance.currentUrlNotifier,
       builder: (context, currentUrl, _) {
         // Hanya tampil jika ada lagu yang aktif
-        if (currentUrl == null || currentUrl.isEmpty)
+        if (currentUrl == null || currentUrl.isEmpty) {
           return const SizedBox.shrink();
+        }
 
         return ValueListenableBuilder<String?>(
           valueListenable: AudioManager.instance.titleNotifier,
@@ -1171,8 +1402,8 @@ class _DashboardPageState extends State<DashboardPage> {
                   CircleAvatar(
                     radius: 40,
                     backgroundColor: accentGold.withOpacity(0.2),
-                    child:
-                        const Icon(Icons.person, size: 40, color: accentGold),
+                    backgroundImage:
+                        const AssetImage('assets/images/Famotion.png'),
                   ),
                   const SizedBox(height: 16),
                   const Text(
@@ -1371,22 +1602,29 @@ class _DashboardPageState extends State<DashboardPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Image / Album Art
+              // Image / Album Art — deteksi asset lokal vs network
               ClipRRect(
                 borderRadius: BorderRadius.circular(14),
-                child: Image.network(
-                  imageUrl,
-                  height: 100,
-                  width: double.infinity,
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) => Container(
-                    height: 100,
-                    width: double.infinity,
-                    color: Colors.white10,
-                    child: const Icon(Icons.music_note,
-                        color: Colors.white54, size: 40),
-                  ),
-                ),
+                child: imageUrl.startsWith('assets/')
+                    ? Image.asset(
+                        imageUrl,
+                        height: 100,
+                        width: double.infinity,
+                        fit: BoxFit.cover,
+                      )
+                    : Image.network(
+                        imageUrl,
+                        height: 100,
+                        width: double.infinity,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) => Container(
+                          height: 100,
+                          width: double.infinity,
+                          color: Colors.white10,
+                          child: const Icon(Icons.music_note,
+                              color: Colors.white54, size: 40),
+                        ),
+                      ),
               ),
               const SizedBox(height: 10),
               Text(
@@ -1478,22 +1716,29 @@ class _DashboardPageState extends State<DashboardPage> {
           padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 4),
           child: Row(
             children: [
-              // Thumbnail Image
+              // Thumbnail Image — deteksi asset lokal vs network
               ClipRRect(
                 borderRadius: BorderRadius.circular(8),
-                child: Image.network(
-                  imageUrl,
-                  width: 50,
-                  height: 50,
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) => Container(
-                    width: 50,
-                    height: 50,
-                    color: Colors.white10,
-                    child: const Icon(Icons.music_note,
-                        color: Colors.white54, size: 24),
-                  ),
-                ),
+                child: imageUrl.startsWith('assets/')
+                    ? Image.asset(
+                        imageUrl,
+                        width: 50,
+                        height: 50,
+                        fit: BoxFit.cover,
+                      )
+                    : Image.network(
+                        imageUrl,
+                        width: 50,
+                        height: 50,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) => Container(
+                          width: 50,
+                          height: 50,
+                          color: Colors.white10,
+                          child: const Icon(Icons.music_note,
+                              color: Colors.white54, size: 24),
+                        ),
+                      ),
               ),
               const SizedBox(width: 16),
               // Info Info
@@ -1692,8 +1937,11 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 }
 
+
+
 // Custom Painter untuk Menggambar 3 Garis Gelombang Pendek
 class WavePainter extends CustomPainter {
+
   final Color color;
   WavePainter({required this.color});
 

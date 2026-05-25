@@ -86,7 +86,7 @@ class _MPAnalyticsScreenState extends State<MPAnalyticsScreen> {
                         ],
                       ),
                     );
-                  }).toList(),
+                  }),
                   const Spacer(),
                   Container(
                     padding: const EdgeInsets.all(16),

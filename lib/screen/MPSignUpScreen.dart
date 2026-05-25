@@ -4,7 +4,7 @@ import 'package:nb_utils/nb_utils.dart';
 import '../utils/auth_helper.dart';
 
 class MPSignUpScreen extends StatefulWidget {
-  const MPSignUpScreen({Key? key}) : super(key: key);
+  const MPSignUpScreen({super.key});
 
   @override
   _MPSignUpScreenState createState() => _MPSignUpScreenState();
