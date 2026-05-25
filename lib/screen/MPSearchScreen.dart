@@ -1,10 +1,7 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import '../player_page.dart';
 import '../utils/notification_helper.dart';
 import '../widgets/empty_state_widget.dart';
-import '../utils/auth_helper.dart';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 
 class MPSearchScreen extends StatefulWidget {
@@ -151,9 +148,9 @@ class _MPSearchScreenState extends State<MPSearchScreen> {
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 16),
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.35),
+                          color: Colors.white.withValues(alpha: 0.35),
                           borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: Colors.white.withOpacity(0.5)),
+                          border: Border.all(color: Colors.white.withValues(alpha: 0.5)),
                         ),
                         child: TextField(
                           controller: _searchController,
@@ -170,10 +167,10 @@ class _MPSearchScreenState extends State<MPSearchScreen> {
                             hintText: "Cari lagu, artis, atau album...",
                             contentPadding: EdgeInsets.symmetric(vertical: 12), 
                             hintStyle: TextStyle(
-                              color: textDark.withOpacity(0.6),
+                              color: textDark.withValues(alpha: 0.6),
                               fontWeight: FontWeight.normal,
                             ),
-                            icon: Icon(Icons.search, color: textDark.withOpacity(0.8), size: 24),
+                            icon: Icon(Icons.search, color: textDark.withValues(alpha: 0.8), size: 24),
                             suffixIcon: _searchController.text.isNotEmpty
                                 ? IconButton(
                                     icon: const Icon(Icons.clear, color: textDark, size: 20),
@@ -223,7 +220,7 @@ class _MPSearchScreenState extends State<MPSearchScreen> {
                                     icon: Icons.search_rounded,
                                     title: "Cari Lagu",
                                     description: "Temukan lagu favoritmu di Famotion.",
-                                    iconColor: textDark.withOpacity(0.4),
+                                    iconColor: textDark.withValues(alpha: 0.4),
                                     textColor: textDark,
                                   )
                                 : ListView.builder(
@@ -282,9 +279,9 @@ class _MPSearchScreenState extends State<MPSearchScreen> {
         margin: const EdgeInsets.only(bottom: 16),
         padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.08),
+          color: Colors.white.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.white.withOpacity(0.1)),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
         ),
         child: Row(
           children: [
@@ -326,7 +323,7 @@ class _MPSearchScreenState extends State<MPSearchScreen> {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      color: Colors.white.withOpacity(0.7),
+                      color: Colors.white.withValues(alpha: 0.7),
                       fontSize: 12,
                     ),
                   ),
@@ -339,7 +336,7 @@ class _MPSearchScreenState extends State<MPSearchScreen> {
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: const Color(0xFFD8A854).withOpacity(0.9),
+                color: const Color(0xFFD8A854).withValues(alpha: 0.9),
               ),
               child: const Icon(
                 Icons.play_arrow_rounded,

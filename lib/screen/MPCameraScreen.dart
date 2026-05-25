@@ -23,7 +23,6 @@ class _MPCameraScreenState extends State<MPCameraScreen> with SingleTickerProvid
   late AnimationController _scanController;
   /// 'dark' | 'normal' | 'bright'
   String _lightStatus = 'normal';
-  bool get _isTooDark => _lightStatus == 'dark';
   bool _isScanningFrame = false;
 
   // 5-detik countdown sebelum auto-capture
@@ -98,9 +97,13 @@ class _MPCameraScreenState extends State<MPCameraScreen> with SingleTickerProvid
 
       final double avg = totalLuminance / samples;
       final String newStatus;
-      if (avg < 40)        newStatus = 'dark';
-      else if (avg > 210)  newStatus = 'bright';
-      else                  newStatus = 'normal';
+      if (avg < 40) {
+        newStatus = 'dark';
+      } else if (avg > 210) {
+        newStatus = 'bright';
+      } else {
+        newStatus = 'normal';
+      }
 
       if (newStatus != _lightStatus && mounted) {
         setState(() => _lightStatus = newStatus);
