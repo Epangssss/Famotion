@@ -11,6 +11,8 @@ class MPDiscoverScreen extends StatefulWidget {
 class _MPDiscoverScreenState extends State<MPDiscoverScreen> {
   List<dynamic> statsList = [];
   bool isLoading = true;
+  String _selectedFilter = 'all'; // all, today, week, month
+  String _sortOrder = 'desc'; // desc, asc
 
   @override
   void initState() {
@@ -19,6 +21,7 @@ class _MPDiscoverScreenState extends State<MPDiscoverScreen> {
   }
 
   Future<void> _loadStats() async {
+    if (mounted) setState(() => isLoading = true);
     final list = await AuthHelper().getEmotionStats();
     if (mounted) {
       setState(() {
@@ -28,17 +31,65 @@ class _MPDiscoverScreenState extends State<MPDiscoverScreen> {
     }
   }
 
+  List<dynamic> get _filteredAndSortedStats {
+    List<dynamic> filtered = [];
+    final now = DateTime.now();
+
+    for (var item in statsList) {
+      // MongoDB menyimpan sebagai 'created_at', bukan 'timestamp'
+      final timestampStr = (item['created_at'] ?? item['timestamp']) as String?;
+      if (timestampStr == null) continue;
+
+      DateTime? date;
+      try {
+        date = DateTime.parse(timestampStr);
+      } catch (e) {
+        continue;
+      }
+
+      bool include = false;
+      if (_selectedFilter == 'all') {
+        include = true;
+      } else if (_selectedFilter == 'today') {
+        if (date.year == now.year && date.month == now.month && date.day == now.day) {
+          include = true;
+        }
+      } else if (_selectedFilter == 'week') {
+        if (now.difference(date).inDays <= 7) {
+          include = true;
+        }
+      } else if (_selectedFilter == 'month') {
+        if (date.year == now.year && date.month == now.month) {
+          include = true;
+        }
+      }
+
+      if (include) {
+        filtered.add(item);
+      }
+    }
+
+    // Sort by created_at
+    filtered.sort((a, b) {
+      final tsA = (a['created_at'] ?? a['timestamp']) as String? ?? '';
+      final tsB = (b['created_at'] ?? b['timestamp']) as String? ?? '';
+      final dateA = DateTime.tryParse(tsA) ?? DateTime(0);
+      final dateB = DateTime.tryParse(tsB) ?? DateTime(0);
+      if (_sortOrder == 'desc') {
+        return dateB.compareTo(dateA);
+      } else {
+        return dateA.compareTo(dateB);
+      }
+    });
+
+    return filtered;
+  }
+
   // Emoji dan warna untuk setiap emosi
   Map<String, Map<String, dynamic>> _emotionStyles() => {
     'happy': {'emoji': '😊', 'color': const Color(0xFFE2B86C), 'label': 'Happy'},
     'sad': {'emoji': '😢', 'color': const Color(0xFF8BA6C9), 'label': 'Sad'},
     'angry': {'emoji': '😡', 'color': const Color(0xFFD67373), 'label': 'Angry'},
-    'neutral': {'emoji': '😐', 'color': const Color(0xFF91B8A0), 'label': 'Neutral'},
-    'fear': {'emoji': '😰', 'color': const Color(0xFFD188D4), 'label': 'Fear'},
-    'surprise': {'emoji': '😲', 'color': const Color(0xFFE8C96B), 'label': 'Surprise'},
-    'disgust': {'emoji': '🤢', 'color': const Color(0xFF7BAF7E), 'label': 'Disgust'},
-    'stress': {'emoji': '😫', 'color': const Color(0xFFCF8B62), 'label': 'Stress'},
-    'calm': {'emoji': '😌', 'color': const Color(0xFF8AC79B), 'label': 'Calm'},
   };
 
   @override
@@ -51,7 +102,8 @@ class _MPDiscoverScreenState extends State<MPDiscoverScreen> {
 
     // Hitung statistik
     Map<String, int> counts = {};
-    for (var item in statsList) {
+    final displayList = _filteredAndSortedStats;
+    for (var item in displayList) {
       final String em = (item['emotion'] ?? 'unknown').toString().toLowerCase();
       counts[em] = (counts[em] ?? 0) + 1;
     }
@@ -98,6 +150,16 @@ class _MPDiscoverScreenState extends State<MPDiscoverScreen> {
                   "Analisis emosi kamu berdasarkan Face Mood",
                   style: TextStyle(fontSize: 14, color: textDark.withOpacity(0.7)),
                 ),
+                const SizedBox(height: 16),
+                
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(child: _buildFilterDropdown()),
+                    const SizedBox(width: 8),
+                    Expanded(child: _buildSortDropdown()),
+                  ],
+                ),
                 const SizedBox(height: 24),
 
                 // ===== KARTU MOOD UTAMA =====
@@ -136,11 +198,12 @@ class _MPDiscoverScreenState extends State<MPDiscoverScreen> {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  ...statsList.take(10).map((item) {
+                  ...displayList.map((item) {
                     final em = (item['emotion'] ?? 'unknown').toString().toLowerCase();
                     final style = styles[em] ?? {'emoji': '❓', 'color': Colors.grey, 'label': em};
-                    final timestamp = item['timestamp'] ?? '';
-                    return _buildTimelineItem(style, timestamp);
+                    final timestamp = (item['created_at'] ?? item['timestamp'] ?? '').toString();
+                    final confidence = (item['confidence'] as num?)?.toDouble() ?? 0.0;
+                    return _buildTimelineItem(style, timestamp, confidence);
                   }),
                 ],
 
@@ -154,6 +217,62 @@ class _MPDiscoverScreenState extends State<MPDiscoverScreen> {
   }
 
   // ====== WIDGET BUILDERS ======
+
+  Widget _buildFilterDropdown() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white.withOpacity(0.2)),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          value: _selectedFilter,
+          dropdownColor: const Color(0xFF1A2A14),
+          icon: const Icon(Icons.calendar_today, color: Colors.white70, size: 16),
+          style: const TextStyle(color: Colors.white, fontSize: 13),
+          isExpanded: true,
+          onChanged: (value) {
+            if (value != null) setState(() => _selectedFilter = value);
+          },
+          items: const [
+            DropdownMenuItem(value: 'all', child: Text("Semua Waktu")),
+            DropdownMenuItem(value: 'today', child: Text("Hari Ini")),
+            DropdownMenuItem(value: 'week', child: Text("7 Hari Terakhir")),
+            DropdownMenuItem(value: 'month', child: Text("Bulan Ini")),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSortDropdown() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white.withOpacity(0.2)),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          value: _sortOrder,
+          dropdownColor: const Color(0xFF1A2A14),
+          icon: const Icon(Icons.sort, color: Colors.white70, size: 16),
+          style: const TextStyle(color: Colors.white, fontSize: 13),
+          isExpanded: true,
+          onChanged: (value) {
+            if (value != null) setState(() => _sortOrder = value);
+          },
+          items: const [
+            DropdownMenuItem(value: 'desc', child: Text("Terbaru")),
+            DropdownMenuItem(value: 'asc', child: Text("Terlama")),
+          ],
+        ),
+      ),
+    );
+  }
 
   Widget _buildLoadingCard() {
     return Container(
@@ -240,7 +359,7 @@ class _MPDiscoverScreenState extends State<MPDiscoverScreen> {
           ),
           const SizedBox(height: 6),
           Text(
-            "$total kali deteksi dalam 7 hari terakhir",
+            "$total kali deteksi pada periode ini",
             style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 13),
           ),
           const SizedBox(height: 16),
@@ -298,7 +417,7 @@ class _MPDiscoverScreenState extends State<MPDiscoverScreen> {
     );
   }
 
-  Widget _buildTimelineItem(Map<String, dynamic> style, String timestamp) {
+  Widget _buildTimelineItem(Map<String, dynamic> style, String timestamp, double confidence) {
     final Color color = style['color'] as Color;
     String timeStr = '';
     try {
@@ -321,14 +440,49 @@ class _MPDiscoverScreenState extends State<MPDiscoverScreen> {
           Text(style['emoji'] as String, style: const TextStyle(fontSize: 24)),
           const SizedBox(width: 12),
           Expanded(
-            child: Text(
-              style['label'] as String,
-              style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  style['label'] as String,
+                  style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600),
+                ),
+                if (confidence > 0) ...
+                  [
+                    const SizedBox(height: 4),
+                    // Mini progress bar confidence
+                    Row(
+                      children: [
+                        Expanded(
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(4),
+                            child: LinearProgressIndicator(
+                              value: confidence / 100,
+                              backgroundColor: Colors.white.withOpacity(0.08),
+                              color: color,
+                              minHeight: 5,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          '${confidence.toStringAsFixed(1)}%',
+                          style: TextStyle(
+                            color: color,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+              ],
             ),
           ),
+          const SizedBox(width: 8),
           Text(
             timeStr,
-            style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 12),
+            style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 11),
           ),
         ],
       ),

@@ -44,11 +44,11 @@ class _SlidingNotificationWidget extends StatefulWidget {
   final VoidCallback onDismiss;
 
   const _SlidingNotificationWidget({
-    Key? key,
+    super.key,
     required this.message,
     this.isError = true,
     required this.onDismiss,
-  }) : super(key: key);
+  });
 
   @override
   State<_SlidingNotificationWidget> createState() =>

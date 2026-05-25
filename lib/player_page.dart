@@ -72,8 +72,11 @@ class _PlayerPageState extends State<PlayerPage> {
       return;
     }
     try {
+      final ImageProvider imageProvider = imageUrl.startsWith('assets/') 
+          ? AssetImage(imageUrl) as ImageProvider
+          : NetworkImage(imageUrl);
       final PaletteGenerator paletteGenerator = await PaletteGenerator.fromImageProvider(
-        NetworkImage(imageUrl),
+        imageProvider,
         maximumColorCount: 20,
       );
       if (mounted) {
@@ -140,9 +143,9 @@ class _PlayerPageState extends State<PlayerPage> {
     setState(() => _currentIndex = index);
 
     final track = upcoming[index];
-    final videoId = track['videoId'] as String;
+    final videoId = track['videoId'] as String?;
 
-    if (videoId.isNotEmpty) {
+    if (videoId != null && videoId.isNotEmpty) {
       await AudioManager.instance.playYoutubeVideo(
         videoId: videoId,
         title: track['title'] as String,
@@ -343,16 +346,27 @@ class _PlayerPageState extends State<PlayerPage> {
                       valueListenable: AudioManager.instance.imageUrlNotifier,
                       builder: (context, imageUrl, _) => ClipRRect(
                         borderRadius: BorderRadius.circular(6),
-                        child: Image.network(
-                          imageUrl ?? 'https://images.unsplash.com/photo-1490730141103-6cac27aaab94?q=80',
-                          width: 56,
-                          height: 56,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => Container(
-                            width: 56, height: 56, color: Colors.white10,
-                            child: const Icon(Icons.music_note, color: Colors.white24),
-                          ),
-                        ),
+                        child: (imageUrl != null && imageUrl.startsWith('assets/'))
+                          ? Image.asset(
+                              imageUrl,
+                              width: 56,
+                              height: 56,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => Container(
+                                width: 56, height: 56, color: Colors.white10,
+                                child: const Icon(Icons.music_note, color: Colors.white24),
+                              ),
+                            )
+                          : Image.network(
+                              imageUrl ?? 'https://images.unsplash.com/photo-1490730141103-6cac27aaab94?q=80',
+                              width: 56,
+                              height: 56,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => Container(
+                                width: 56, height: 56, color: Colors.white10,
+                                child: const Icon(Icons.music_note, color: Colors.white24),
+                              ),
+                            ),
                       ),
                     ),
                     const SizedBox(width: 16),
@@ -514,6 +528,7 @@ class _PlayerPageState extends State<PlayerPage> {
     return SizedBox(
       height: h,
       child: PageView.builder(
+        key: ValueKey(upcoming.isNotEmpty ? upcoming.first['audioUrl'] : 'empty'),
         controller: _pageController,
         itemCount: upcoming.length,
         onPageChanged: (index) {
@@ -535,23 +550,34 @@ class _PlayerPageState extends State<PlayerPage> {
               ),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(16),
-                child: CachedNetworkImage(
-                  key: ValueKey(track['imageUrl']),
-                  imageUrl: track['imageUrl'] ?? '',
-                  width: double.infinity,
-                  height: double.infinity,
-                  fit: BoxFit.cover,
-                  fadeInDuration: const Duration(milliseconds: 150), // Mempercepat efek loading
-                  memCacheWidth: 600, // Mempercepat cache di memori
-                  placeholder: (_, __) => Container(
-                    color: Colors.white10,
-                    child: const Center(child: CircularProgressIndicator(color: Colors.white24, strokeWidth: 2)),
-                  ),
-                  errorWidget: (_, __, ___) => Container(
-                    color: Colors.white10,
-                    child: const Icon(Icons.music_note, color: Colors.white54, size: 80),
-                  ),
-                ),
+                child: (track['imageUrl'] != null && (track['imageUrl'] as String).startsWith('assets/'))
+                  ? Image.asset(
+                      track['imageUrl'],
+                      width: double.infinity,
+                      height: double.infinity,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => Container(
+                        color: Colors.white10,
+                        child: const Icon(Icons.music_note, color: Colors.white54, size: 80),
+                      ),
+                    )
+                  : CachedNetworkImage(
+                      key: ValueKey(track['imageUrl']),
+                      imageUrl: track['imageUrl'] ?? '',
+                      width: double.infinity,
+                      height: double.infinity,
+                      fit: BoxFit.cover,
+                      fadeInDuration: const Duration(milliseconds: 150), // Mempercepat efek loading
+                      memCacheWidth: 600, // Mempercepat cache di memori
+                      placeholder: (_, __) => Container(
+                        color: Colors.white10,
+                        child: const Center(child: CircularProgressIndicator(color: Colors.white24, strokeWidth: 2)),
+                      ),
+                      errorWidget: (_, __, ___) => Container(
+                        color: Colors.white10,
+                        child: const Icon(Icons.music_note, color: Colors.white54, size: 80),
+                      ),
+                    ),
               ),
             ),
           );
@@ -603,7 +629,7 @@ class _PlayerPageState extends State<PlayerPage> {
       'videoId': audioUrl, 
     };
 
-    TextEditingController _newPlaylistController = TextEditingController();
+    TextEditingController newPlaylistController = TextEditingController();
 
     showModalBottomSheet(
       context: context,
@@ -629,7 +655,7 @@ class _PlayerPageState extends State<PlayerPage> {
                     children: [
                       Expanded(
                         child: TextField(
-                          controller: _newPlaylistController,
+                          controller: newPlaylistController,
                           style: const TextStyle(color: Colors.white),
                           decoration: InputDecoration(
                             hintText: "Nama playlist baru...",
@@ -644,9 +670,9 @@ class _PlayerPageState extends State<PlayerPage> {
                       const SizedBox(width: 12),
                       ElevatedButton(
                         onPressed: () async {
-                          if (_newPlaylistController.text.trim().isNotEmpty) {
-                            await PlaylistManager.instance.createPlaylist(_newPlaylistController.text.trim());
-                            _newPlaylistController.clear();
+                          if (newPlaylistController.text.trim().isNotEmpty) {
+                            await PlaylistManager.instance.createPlaylist(newPlaylistController.text.trim());
+                            newPlaylistController.clear();
                             setSheetState(() {});
                           }
                         },
@@ -908,9 +934,16 @@ class _PlayerPageState extends State<PlayerPage> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        IconButton(
-          icon: Icon(Icons.shuffle, color: Colors.white70, size: 24 * sizeMult),
-          onPressed: () {},
+        ValueListenableBuilder<bool>(
+          valueListenable: AudioManager.instance.isShuffleNotifier,
+          builder: (context, isShuffle, _) => IconButton(
+            icon: Icon(
+              Icons.shuffle,
+              color: isShuffle ? Colors.greenAccent : Colors.white70,
+              size: 24 * sizeMult,
+            ),
+            onPressed: () => AudioManager.instance.toggleShuffle(),
+          ),
         ),
         SizedBox(width: isMobile ? 8 : 8),
         IconButton(

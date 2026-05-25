@@ -1,9 +1,11 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:youtube_explode_dart/youtube_explode_dart.dart';
+import 'package:http/http.dart' as http;
 import '../player_page.dart';
-import '../services/audio_manager.dart';
 import '../utils/notification_helper.dart';
 import '../widgets/empty_state_widget.dart';
+import '../utils/auth_helper.dart';
+import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 
 class MPSearchScreen extends StatefulWidget {
   const MPSearchScreen({super.key});
@@ -15,7 +17,7 @@ class MPSearchScreen extends StatefulWidget {
 class _MPSearchScreenState extends State<MPSearchScreen> {
   final TextEditingController _searchController = TextEditingController();
 
-  List<Video> _searchResults = [];
+  List<dynamic> _searchResults = [];
   bool _isLoading = false;
   String _searchQuery = "";
   bool _hasError = false;
@@ -38,19 +40,61 @@ class _MPSearchScreenState extends State<MPSearchScreen> {
       _errorMessage = "";
     });
 
+    final yt = YoutubeExplode();
     try {
-      // Tambahkan kata 'music' supaya YouTube bias ke lagu, bukan live stream / channel
-      final searchList = await AudioManager.instance.yt.search.search('$query music');
+      // Selalu tambahkan "official audio" agar YouTube bias ke lagu asli,
+      // bukan clip/meme/short apapun kata yang diketik user
+      final String musicQuery = '${query.trim()} official audio';
+      
+      final searchResult = await yt.search.search(musicQuery);
+      
       if (mounted) {
-        final filtered = searchList.where((v) {
-          // Filter 1: Buang live stream (isLive == true atau tidak ada durasi)
-          if (v.isLive) return false;
-          final dur = v.duration;
-          if (dur == null) return false;
-          // Filter 2: Buang video terlalu pendek (shorts < 1 mnt) atau terlalu panjang (kompilasi/podcast > 7 mnt)
-          final mins = dur.inMinutes;
-          return mins >= 1 && mins <= 7;
-        }).take(20).toList();
+        // Kata kunci konten yang harus dibuang — termasuk kata bahasa Indonesia
+        const List<String> blockedKeywords = [
+          // Shorts / Clip / Fancam
+          '#shorts', '#short', 'shorts', 'short film',
+          'clip', 'mv clip', 'fancam', 'fan cam',
+          // Meme / Viral / Lucu
+          'meme', 'funny', 'lucu', 'viral', 'tiktok',
+          'ngakak', 'kocak', 'parody', 'parodi',
+          // Reaction / Commentary
+          'reaction', 'react', 'reacts', 'reaksi',
+          // Podcast / Interview
+          'podcast', 'interview',
+          // Concert / Album
+          'full album', 'full concert', 'live concert',
+          'konser penuh', 'penampilan langsung',
+          // Lainnya
+          'trailer', 'teaser', 'behind the scenes',
+          'compilation', 'kompilasi',
+          'best of',
+        ];
+
+        List<dynamic> filtered = [];
+        for (var video in searchResult) {
+          final String rawTitle = video.title;
+          final String lowerTitle = rawTitle.toLowerCase();
+
+          // 1. Filter konten bermasalah berdasarkan judul
+          bool isBlocked = blockedKeywords.any((kw) => lowerTitle.contains(kw));
+          if (isBlocked) continue;
+
+          // 2. Filter durasi minimum 2 menit (lagu asli hampir selalu >= 2 menit)
+          final duration = video.duration;
+          if (duration != null) {
+            if (duration.inSeconds < 110) continue; // < ~2 menit → skip (short/meme)
+          }
+
+          filtered.add({
+            'title': video.title,
+            'artist': video.author,
+            'duration': duration != null 
+                ? '${duration.inMinutes}:${(duration.inSeconds % 60).toString().padLeft(2, '0')}' 
+                : '',
+            'thumbnail': video.thumbnails.highResUrl,
+            'videoId': video.id.value,
+          });
+        }
 
         setState(() {
           _searchResults = filtered;
@@ -62,57 +106,16 @@ class _MPSearchScreenState extends State<MPSearchScreen> {
         setState(() {
           _isLoading = false;
           _hasError = true;
-          _errorMessage = "Gagal memuat hasil pencarian. Periksa koneksi intenet Anda atau coba dengan kata kunci lain.";
+          _errorMessage = "Gagal memuat hasil pencarian. Error: $e";
         });
       }
+    } finally {
+      yt.close();
     }
-  }
-
-  String _formatDuration(Duration? duration) {
-    if (duration == null) return "--:--";
-    String twoDigits(int n) => n.toString().padLeft(2, "0");
-    String twoDigitMinutes = twoDigits(duration.inMinutes.remainder(60));
-    String twoDigitSeconds = twoDigits(duration.inSeconds.remainder(60));
-    if (duration.inHours > 0) {
-      return "${twoDigits(duration.inHours)}:$twoDigitMinutes:$twoDigitSeconds";
-    }
-    return "$twoDigitMinutes:$twoDigitSeconds";
-  }
-
-  /// Bersihkan nama channel YouTube menjadi nama artis yang rapi.
-  /// Contoh: "Ed Sheeran - Topic" → "Ed Sheeran"
-  ///          "TaylorSwiftVEVO" → "TaylorSwift"
-  String _cleanArtistName(String channelName, String videoTitle) {
-    String artist = channelName;
-
-    // Hapus sufiks umum channel YouTube musik
-    final suffixes = [
-      RegExp(r'\s*-\s*Topic', caseSensitive: false),
-      RegExp(r'VEVO', caseSensitive: false),
-      RegExp(r'Official', caseSensitive: false),
-      RegExp(r'Records', caseSensitive: false),
-      RegExp(r'Music', caseSensitive: false),
-      RegExp(r'Entertainment', caseSensitive: false),
-      RegExp(r'Channel', caseSensitive: false),
-    ];
-    for (final pattern in suffixes) {
-      artist = artist.replaceAll(pattern, '').trim();
-    }
-
-    // Jika nama channel tidak informatif / terlalu pendek, coba ambil dari judul video.
-    // Format umum: "[Artis] - [Judul Lagu]"
-    if (artist.isEmpty || artist.length <= 2) {
-      if (videoTitle.contains(' - ')) {
-        artist = videoTitle.split(' - ').first.trim();
-      }
-    }
-
-    return artist.isNotEmpty ? artist : channelName;
   }
 
   @override
   Widget build(BuildContext context) {
-    // Colors matching the dashboard
     const Color bgTop = Color(0xFFDCE7CD);
     const Color bgMid = Color(0xFF6A8A53);
     const Color bgBottom = Color(0xFF1A2A14);
@@ -136,8 +139,7 @@ class _MPSearchScreenState extends State<MPSearchScreen> {
             children: [
               // Search Bar Header
               Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
                 child: Row(
                   children: [
                     GestureDetector(
@@ -151,30 +153,30 @@ class _MPSearchScreenState extends State<MPSearchScreen> {
                         decoration: BoxDecoration(
                           color: Colors.white.withOpacity(0.35),
                           borderRadius: BorderRadius.circular(20),
-                          border:
-                              Border.all(color: Colors.white.withOpacity(0.5)),
+                          border: Border.all(color: Colors.white.withOpacity(0.5)),
                         ),
                         child: TextField(
                           controller: _searchController,
                           autofocus: true,
                           style: const TextStyle(
-                              color: textDark,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w500),
+                            color: textDark,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                          ),
                           textInputAction: TextInputAction.search,
                           onSubmitted: _performSearch,
                           decoration: InputDecoration(
                             border: InputBorder.none,
                             hintText: "Cari lagu, artis, atau album...",
+                            contentPadding: EdgeInsets.symmetric(vertical: 12), 
                             hintStyle: TextStyle(
-                                color: textDark.withOpacity(0.6),
-                                fontWeight: FontWeight.normal),
-                            icon: Icon(Icons.search,
-                                color: textDark.withOpacity(0.8), size: 24),
+                              color: textDark.withOpacity(0.6),
+                              fontWeight: FontWeight.normal,
+                            ),
+                            icon: Icon(Icons.search, color: textDark.withOpacity(0.8), size: 24),
                             suffixIcon: _searchController.text.isNotEmpty
                                 ? IconButton(
-                                    icon: const Icon(Icons.clear,
-                                        color: textDark, size: 20),
+                                    icon: const Icon(Icons.clear, color: textDark, size: 20),
                                     onPressed: () {
                                       _searchController.clear();
                                       setState(() {});
@@ -183,7 +185,7 @@ class _MPSearchScreenState extends State<MPSearchScreen> {
                                 : null,
                           ),
                           onChanged: (text) {
-                            setState(() {}); // Update clear button visibility
+                            setState(() {});
                           },
                         ),
                       ),
@@ -212,7 +214,7 @@ class _MPSearchScreenState extends State<MPSearchScreen> {
                             ? MPEmptyStateWidget(
                                 icon: Icons.search_off_rounded,
                                 title: "Tidak Ditemukan",
-                                description: "Kami tidak dapat menemukan lagu untuk '$_searchQuery'. Coba gunakan kata kunci lain.",
+                                description: "Tidak ada lagu untuk '$_searchQuery'. Coba kata kunci lain.",
                                 iconColor: accentGold,
                                 textColor: textDark,
                               )
@@ -224,16 +226,14 @@ class _MPSearchScreenState extends State<MPSearchScreen> {
                                     iconColor: textDark.withOpacity(0.4),
                                     textColor: textDark,
                                   )
-                            : ListView.builder(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 20, vertical: 8),
-                                physics: const BouncingScrollPhysics(),
-                                itemCount: _searchResults.length,
-                                itemBuilder: (context, index) {
-                                  final video = _searchResults[index];
-                                  return _buildSearchResultItem(video);
-                                },
-                              ),
+                                : ListView.builder(
+                                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                                    physics: const BouncingScrollPhysics(),
+                                    itemCount: _searchResults.length,
+                                    itemBuilder: (context, index) {
+                                      return _buildSearchResultItem(_searchResults[index]);
+                                    },
+                                  ),
               ),
             ],
           ),
@@ -242,7 +242,26 @@ class _MPSearchScreenState extends State<MPSearchScreen> {
     );
   }
 
-  Widget _buildSearchResultItem(Video video) {
+  Widget _buildSearchResultItem(dynamic video) {
+    final String title = video['title'] ?? 'Unknown';
+    final String artist = video['artist'] ?? 'Unknown';
+    final String imageUrl = video['thumbnail'] ?? '';
+    final String durationStr = video['duration'] ?? '';
+    final String videoId = video['videoId'] ?? '';
+
+    // Parse duration string "mm:ss" or "hh:mm:ss" → milliseconds
+    int durationMs = 0;
+    if (durationStr.isNotEmpty) {
+      final p = durationStr.split(':');
+      try {
+        if (p.length == 2) {
+          durationMs = (int.parse(p[0]) * 60 + int.parse(p[1])) * 1000;
+        } else if (p.length == 3) {
+          durationMs = (int.parse(p[0]) * 3600 + int.parse(p[1]) * 60 + int.parse(p[2])) * 1000;
+        }
+      } catch (_) {}
+    }
+
     return GestureDetector(
       onTap: () {
         showSlidingInfoNotification(context, "Lagu akan segera diputar, mohon bersabar...");
@@ -250,11 +269,11 @@ class _MPSearchScreenState extends State<MPSearchScreen> {
           context,
           MaterialPageRoute(
             builder: (_) => PlayerPage(
-              videoId: video.id.value,
-              title: video.title,
-              artist: _cleanArtistName(video.author, video.title),
-              imageUrl: video.thumbnails.highResUrl,
-              durationMs: video.duration?.inMilliseconds,
+              videoId: videoId,
+              title: title,
+              artist: artist,
+              imageUrl: imageUrl,
+              durationMs: durationMs,
             ),
           ),
         );
@@ -273,7 +292,7 @@ class _MPSearchScreenState extends State<MPSearchScreen> {
             ClipRRect(
               borderRadius: BorderRadius.circular(12),
               child: Image.network(
-                video.thumbnails.mediumResUrl,
+                imageUrl,
                 width: 60,
                 height: 60,
                 fit: BoxFit.cover,
@@ -281,8 +300,7 @@ class _MPSearchScreenState extends State<MPSearchScreen> {
                   width: 60,
                   height: 60,
                   color: Colors.white10,
-                  child: const Icon(Icons.music_note,
-                      color: Colors.white54, size: 30),
+                  child: const Icon(Icons.music_note, color: Colors.white54, size: 30),
                 ),
               ),
             ),
@@ -293,7 +311,7 @@ class _MPSearchScreenState extends State<MPSearchScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    video.title,
+                    title,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
@@ -304,7 +322,7 @@ class _MPSearchScreenState extends State<MPSearchScreen> {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    "${_cleanArtistName(video.author, video.title)} • ${_formatDuration(video.duration)}",
+                    "$artist • $durationStr",
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
@@ -321,7 +339,7 @@ class _MPSearchScreenState extends State<MPSearchScreen> {
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: const Color(0xFFD8A854).withOpacity(0.9), // accentGold
+                color: const Color(0xFFD8A854).withOpacity(0.9),
               ),
               child: const Icon(
                 Icons.play_arrow_rounded,
