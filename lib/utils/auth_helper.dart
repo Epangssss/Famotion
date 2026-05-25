@@ -23,21 +23,21 @@ class AuthHelper {
       // PERHATIAN: Masukkan Client ID tipe "Web Application" kamu di bawah ini
       const String webClientId = "449350254702-jfm20t2q7uencjae54uq1fhens4opf7n.apps.googleusercontent.com";
       
-      // Inisialisasi GoogleSignIn (Wajib di v7.0.0+)
-      await gauth.GoogleSignIn.instance.initialize(
+      // Inisialisasi GoogleSignIn
+      final gauth.GoogleSignIn googleSignIn = gauth.GoogleSignIn(
         clientId: kIsWeb ? webClientId : null,
         serverClientId: webClientId,
       );
 
       // 1. Munculkan popup login Google
-      final gauth.GoogleSignInAccount googleUser = await gauth.GoogleSignIn.instance.authenticate();
+      final gauth.GoogleSignInAccount? googleUser = await googleSignIn.signIn();
       if (googleUser == null) {
         toast("Login dibatalkan");
         return; 
       }
 
       // 2. Dapatkan ID Token
-      final gauth.GoogleSignInAuthentication googleAuth = googleUser.authentication;
+      final gauth.GoogleSignInAuthentication googleAuth = await googleUser.authentication;
       final String? idToken = googleAuth.idToken;
 
       toast('Berhasil masuk Google, memverifikasi ke server...');
