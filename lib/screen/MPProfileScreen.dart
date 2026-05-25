@@ -48,7 +48,7 @@ class _MPProfileScreenState extends State<MPProfileScreen> {
                         CircleAvatar(
                           radius: 50,
                           backgroundColor: textDark.withOpacity(0.15),
-                          backgroundImage: _getProfileImage() ?? const AssetImage('assets/icons/favicon.png'),
+                          backgroundImage: _getProfileImage() ?? const AssetImage('assets/images/Famotion.png'),
                         ),
                         GestureDetector(
                           onTap: () => _showEditProfileDialog(context),

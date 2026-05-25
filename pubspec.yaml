@@ -2,7 +2,7 @@ name: famotion
 description: "A new Flutter project."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
-publish_to: 'none' # Remove this line if you wish to publish to pub.dev
+publish_to: "none" # Remove this line if you wish to publish to pub.dev
 
 # The following defines the version and build number for your application.
 # A version number is three numbers separated by dots, like 1.2.43
@@ -40,16 +40,10 @@ dependencies:
   youtube_explode_dart: ^3.0.0
   just_audio: ^0.10.5
   dart_ytmusic_api: ^1.3.6
-  nb_utils: ^7.1.7
-  permission_handler: ^11.3.0
+  nb_utils: ^7.2.0
   flutter_dotenv: ^6.0.0
   just_audio_windows: ^0.2.2
   palette_generator: ^0.3.3+7
-  cached_network_image: ^3.3.1
-  google_sign_in: ^7.1.1
-  marquee: ^2.3.0
-  image_picker: ^1.2.0
-  just_audio_background: ^0.0.1-beta.17
 
 dev_dependencies:
   flutter_test:
@@ -67,7 +61,6 @@ dev_dependencies:
 
 # The following section is specific to Flutter packages.
 flutter:
-
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in
   # the material Icons class.
