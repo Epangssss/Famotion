@@ -110,16 +110,16 @@ class _MPLibraryScreenState extends State<MPLibraryScreen> {
         margin: const EdgeInsets.only(right: 10),
         padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
         decoration: BoxDecoration(
-          color: isSelected ? accentGold : Colors.white.withOpacity(0.2),
+          color: isSelected ? accentGold : Colors.white.withValues(alpha: 0.2),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: isSelected ? accentGold : Colors.white.withOpacity(0.3),
+            color: isSelected ? accentGold : Colors.white.withValues(alpha: 0.3),
           ),
         ),
         child: Text(
           label,
           style: TextStyle(
-            color: isSelected ? Colors.white : textDark.withOpacity(0.8),
+            color: isSelected ? Colors.white : textDark.withValues(alpha: 0.8),
             fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
           ),
         ),
@@ -321,9 +321,9 @@ class _MPLibraryScreenState extends State<MPLibraryScreen> {
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.08),
+          color: Colors.white.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.white.withOpacity(0.1)),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
         ),
         child: Row(
           children: [
@@ -333,7 +333,7 @@ class _MPLibraryScreenState extends State<MPLibraryScreen> {
               decoration: BoxDecoration(
                 color: iconColor,
                 borderRadius: BorderRadius.circular(12),
-                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.15), blurRadius: 5, offset: const Offset(0, 2))],
+                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.15), blurRadius: 5, offset: const Offset(0, 2))],
               ),
               child: Icon(icon, color: Colors.white, size: 28),
             ),
@@ -344,7 +344,7 @@ class _MPLibraryScreenState extends State<MPLibraryScreen> {
                 children: [
                   Text(title, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 4),
-                  Text(subtitle, style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 13)),
+                  Text(subtitle, style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 13)),
                 ],
               ),
             ),
@@ -362,8 +362,6 @@ class _MPLibraryScreenState extends State<MPLibraryScreen> {
     final title = track['title'] ?? 'Unknown';
     final artist = track['artist'] ?? 'Unknown';
     final imageUrl = track['imageUrl'] ?? '';
-    final audioUrl = track['audioUrl'] ?? '';
-    final videoId = track['videoId'] ?? '';
 
     return GestureDetector(
       onTap: () => _playTrack(track, allTracks, index),
@@ -371,7 +369,7 @@ class _MPLibraryScreenState extends State<MPLibraryScreen> {
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.07),
+          color: Colors.white.withValues(alpha: 0.07),
           borderRadius: BorderRadius.circular(14),
         ),
         child: Row(
@@ -392,7 +390,7 @@ class _MPLibraryScreenState extends State<MPLibraryScreen> {
                       style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
                   const SizedBox(height: 4),
                   Text(artist, maxLines: 1, overflow: TextOverflow.ellipsis,
-                      style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 12)),
+                      style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 12)),
                 ],
               ),
             ),
@@ -532,7 +530,6 @@ class _MPLibraryScreenState extends State<MPLibraryScreen> {
   // ─────────────────────────────────────────
   void _playTrack(Map<String, dynamic> track, List<Map<String, dynamic>> allTracks, int startIndex) {
     final videoId = track['videoId'] ?? '';
-    final audioUrl = track['audioUrl'] ?? '';
     final title = track['title'] ?? 'Unknown';
     final artist = track['artist'] ?? 'Unknown';
     final imageUrl = track['imageUrl'] ?? '';

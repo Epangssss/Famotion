@@ -1,5 +1,4 @@
 import 'dart:io' show Platform;
-import 'dart:math';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart';
@@ -39,7 +38,7 @@ class AudioManager {
     audioPlayer.currentIndexStream.listen((index) {
       if (index == null) return;
       final sequence = audioPlayer.sequence;
-      if (sequence == null || index >= sequence.length) return;
+      if (index >= sequence.length) return;
 
       final mediaItem = sequence[index].tag as MediaItem;
 
@@ -110,7 +109,6 @@ class AudioManager {
       ValueNotifier<List<Map<String, dynamic>>>([]);
   int currentIndex = 0;
   int _playRequestId = 0;
-  bool _isPlayingNext = false; // guard agar completed tidak trigger dobel
 
   // Global queue preferences
   String? currentQueueGenre;
@@ -204,8 +202,6 @@ class AudioManager {
       debugPrint('🎵 Playing: $audioUrl');
       
       // Deteksi asset lokal vs URL jaringan
-      final bool isLocalAsset = audioUrl.startsWith('assets/');
-
       AudioSource createSource(String url, String t, String a, String img, int? dur) {
         final mediaItem = MediaItem(
           id: url,
