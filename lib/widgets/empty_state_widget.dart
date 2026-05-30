@@ -32,13 +32,13 @@ class MPEmptyStateWidget extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: iconColor.withOpacity(0.1),
+                color: iconColor.withValues(alpha: 0.1),
                 shape: BoxShape.circle,
               ),
               child: Icon(
                 icon,
                 size: 64,
-                color: iconColor.withOpacity(0.8),
+                color: iconColor.withValues(alpha: 0.8),
               ),
             ),
             const SizedBox(height: 24),
@@ -57,7 +57,7 @@ class MPEmptyStateWidget extends StatelessWidget {
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 14,
-                color: textColor.withOpacity(0.7),
+                color: textColor.withValues(alpha: 0.7),
                 height: 1.4,
               ),
             ),

@@ -18,6 +18,15 @@ migrate_working_dir/
 *.iws
 .idea/
 
+# Model machine learning besar
+*.keras
+*.h5
+*.pkl
+*.joblib
+*.pt
+*.pth
+
+python/revisi_model/models/
 # The .vscode folder contains launch configuration and tasks you configure in
 # VS Code which you may wish to be included in version control, so this line
 # is commented out by default.
@@ -43,3 +52,5 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+python/revisi_model/models/
+*.keras

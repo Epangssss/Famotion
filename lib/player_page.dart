@@ -1,5 +1,4 @@
 import 'dart:math' as math;
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:palette_generator/palette_generator.dart';
@@ -207,7 +206,7 @@ class _PlayerPageState extends State<PlayerPage> {
                   end: Alignment.bottomCenter,
                   colors: [
                     _backgroundColor,
-                    _backgroundColor.withOpacity(0.5),
+                    _backgroundColor.withValues(alpha: 0.5),
                     Colors.black,
                   ],
                   stops: const [0.0, 0.4, 1.0],
@@ -333,7 +332,7 @@ class _PlayerPageState extends State<PlayerPage> {
         // Pinned Bottom Playback Bar
         Container(
           height: 90,
-          color: Colors.black.withOpacity(0.85), // Solid dark bottom bar spanning full width
+          color: Colors.black.withValues(alpha: 0.85), // Solid dark bottom bar spanning full width
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Row(
             children: [
@@ -545,7 +544,7 @@ class _PlayerPageState extends State<PlayerPage> {
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(16),
                 boxShadow: [
-                  BoxShadow(color: Colors.black.withOpacity(0.4), blurRadius: 20, offset: const Offset(0, 10))
+                  BoxShadow(color: Colors.black.withValues(alpha: 0.4), blurRadius: 20, offset: const Offset(0, 10))
                 ],
               ),
               child: ClipRRect(
@@ -659,9 +658,10 @@ class _PlayerPageState extends State<PlayerPage> {
                           style: const TextStyle(color: Colors.white),
                           decoration: InputDecoration(
                             hintText: "Nama playlist baru...",
-                            hintStyle: TextStyle(color: Colors.white.withOpacity(0.5)),
+                            hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.5)),
                             filled: true,
-                            fillColor: Colors.white.withOpacity(0.1),
+                            fillColor: Colors.white.withValues(alpha: 0.1),
+
                             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
                             contentPadding: const EdgeInsets.symmetric(horizontal: 16),
                           ),
@@ -788,7 +788,7 @@ class _PlayerPageState extends State<PlayerPage> {
                   valueListenable: AudioManager.instance.artistNotifier,
                   builder: (context, artist, _) => Text(
                     artist ?? 'Waiting for track info',
-                    style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 16),
+                    style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 16),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -806,7 +806,7 @@ class _PlayerPageState extends State<PlayerPage> {
               return IconButton(
                 icon: Icon(
                   isLiked ? Icons.favorite : Icons.favorite_border,
-                  color: isLiked ? Colors.redAccent : Colors.white.withOpacity(0.9),
+                  color: isLiked ? Colors.redAccent : Colors.white.withValues(alpha: 0.9),
                   size: 28,
                 ),
                 onPressed: _handleLikeToggle,
@@ -816,7 +816,7 @@ class _PlayerPageState extends State<PlayerPage> {
           IconButton(
             icon: Icon(
               Icons.playlist_add_rounded,
-              color: Colors.white.withOpacity(0.9),
+              color: Colors.white.withValues(alpha: 0.9),
               size: 28,
             ),
             onPressed: () => _showAddToPlaylistBottomSheet(context),
@@ -1052,7 +1052,7 @@ class _PlayerPageState extends State<PlayerPage> {
                     margin: const EdgeInsets.only(bottom: 8),
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.05),
+                      color: Colors.white.withValues(alpha: 0.05),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Row(
@@ -1106,22 +1106,22 @@ class _PlayerPageState extends State<PlayerPage> {
               width: double.infinity,
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.05),
+                color: Colors.white.withValues(alpha: 0.05),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Column(
                 children: [
-                  Icon(Icons.explore_outlined, color: Colors.white.withOpacity(0.3), size: 40),
+                  Icon(Icons.explore_outlined, color: Colors.white.withValues(alpha: 0.3), size: 40),
                   const SizedBox(height: 12),
                   Text(
                     "Belum ada rekomendasi",
-                    style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 15, fontWeight: FontWeight.w600),
+                    style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 15, fontWeight: FontWeight.w600),
                   ),
                   const SizedBox(height: 6),
                   Text(
                     "Gunakan Face Mood 📸 atau cari lagu 🔍\nagar rekomendasi muncul otomatis!",
                     textAlign: TextAlign.center,
-                    style: TextStyle(color: Colors.white.withOpacity(0.3), fontSize: 13),
+                    style: TextStyle(color: Colors.white.withValues(alpha: 0.3), fontSize: 13),
                   ),
                 ],
               ),

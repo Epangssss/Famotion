@@ -2,7 +2,7 @@ import 'package:google_sign_in/google_sign_in.dart' as gauth;
 import 'package:http/http.dart' as http;
 import 'package:nb_utils/nb_utils.dart';
 import 'package:flutter/material.dart';
-import '../screen/MPDashboardScreen.dart';
+import '../screen/mp_dashboard_screen.dart';
 import 'dart:convert';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import '../services/playlist_manager.dart';
@@ -42,6 +42,7 @@ class AuthHelper {
 
       toast('Berhasil masuk Google, memverifikasi ke server...');
 
+      if (!context.mounted) return;
       // 3. Kirim Token ke Backend
       await _sendTokenToBackend(context, idToken, isSignUp: isSignUp);
 
@@ -80,6 +81,7 @@ class AuthHelper {
         await PlaylistManager.instance.syncFromCloud();
 
         // Arahkan pengunjung ke Dashboard jika verifikasi berhasil dan status valid
+        if (!context.mounted) return;
         DashboardPage().launch(context, isNewTask: true);
       } else if (response.statusCode == 404) {
         toast('Akun belum terdaftar. Silakan Sign Up terlebih dahulu!');
@@ -154,6 +156,7 @@ class AuthHelper {
         // Panggil Playlist dari awan (Timpa data lokal dengan data database)
         await PlaylistManager.instance.syncFromCloud();
 
+        if (!context.mounted) return;
         DashboardPage().launch(context, isNewTask: true);
       } else if (response.statusCode == 404) {
         toast('Email belum terdaftar. Silakan Sign Up terlebih dahulu!');
