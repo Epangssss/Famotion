@@ -62,7 +62,7 @@ class _MPHistoryScreenState extends State<MPHistoryScreen> {
                         : Container(width: 50, height: 50, color: Colors.grey, child: const Icon(Icons.music_note)),
                   ),
                   title: Text(song['title'] ?? 'Unknown', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold), maxLines: 1),
-                  subtitle: Text(song['artist'] ?? 'Unknown', style: TextStyle(color: Colors.white.withOpacity(0.6)), maxLines: 1),
+                  subtitle: Text(song['artist'] ?? 'Unknown', style: TextStyle(color: Colors.white.withValues(alpha: 0.6)), maxLines: 1),
                   trailing: const Icon(Icons.play_circle_fill, color: Color(0xFFD8A854)),
                   onTap: () {
                     // Mainkan ulang lagu jika ditekan

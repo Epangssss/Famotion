@@ -2,15 +2,15 @@ import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:nb_utils/nb_utils.dart';
-import 'MPLoginScreen.dart';
-import 'MPDashboardScreen.dart';
+import 'mp_login_screen.dart';
+import 'mp_dashboard_screen.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 class MPSplashScreen extends StatefulWidget {
   const MPSplashScreen({super.key});
 
   @override
-  _MPSplashScreenState createState() => _MPSplashScreenState();
+  State<MPSplashScreen> createState() => _MPSplashScreenState();
 }
 
 class _MPSplashScreenState extends State<MPSplashScreen>
@@ -135,7 +135,7 @@ class _MPSplashScreenState extends State<MPSplashScreen>
                 shape: BoxShape.circle,
                 boxShadow: [
                   BoxShadow(
-                    color: const Color(0xFFD8A854).withOpacity(0.12),
+                    color: const Color(0xFFD8A854).withValues(alpha: 0.12),
                     blurRadius: 100,
                     spreadRadius: 60,
                   ),
@@ -256,12 +256,12 @@ class _MPSplashScreenState extends State<MPSplashScreen>
                       color: const Color(0xFFE5F1DB), // Soft greenish white
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFFE5F1DB).withOpacity(0.6),
+                          color: const Color(0xFFE5F1DB).withValues(alpha: 0.6),
                           blurRadius: 30,
                           spreadRadius: 5,
                         ),
                         BoxShadow(
-                          color: const Color(0xFFD8A854).withOpacity(0.25),
+                          color: const Color(0xFFD8A854).withValues(alpha: 0.25),
                           blurRadius: 80,
                           spreadRadius: 20,
                         ),
@@ -303,7 +303,7 @@ class _MPSplashScreenState extends State<MPSplashScreen>
                 Text(
                   'Music Face Mood Recommendation',
                   style: secondaryTextStyle(
-                    color: Colors.white.withOpacity(0.65),
+                    color: Colors.white.withValues(alpha: 0.65),
                     size: 16,
                     letterSpacing: 0.5,
                   ),
@@ -355,7 +355,7 @@ class _MPSplashScreenState extends State<MPSplashScreen>
         angle: angle,
         child: Icon(
           icon,
-          color: const Color(0xFFDCE7CD).withOpacity(opacity),
+          color: const Color(0xFFDCE7CD).withValues(alpha: opacity),
           size: size,
         ),
       ),
@@ -369,7 +369,7 @@ class _MusicStaffPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
       ..style = PaintingStyle.stroke
-      ..color = const Color(0xFFDCE7CD).withOpacity(0.12)
+      ..color = const Color(0xFFDCE7CD).withValues(alpha: 0.12)
       ..strokeWidth = 1.5;
 
     final Offset targetCenter = Offset(size.width / 2, size.height / 2 - 110);
@@ -396,7 +396,7 @@ class _TuningForkPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = const Color(0xFFDCE7CD).withOpacity(0.3)
+      ..color = const Color(0xFFDCE7CD).withValues(alpha: 0.3)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 3
       ..strokeCap = StrokeCap.round
@@ -409,7 +409,7 @@ class _TuningForkPainter extends CustomPainter {
 
     // Bottom ball
     canvas.drawCircle(Offset(size.width / 2, size.height), 3.5,
-        Paint()..color = const Color(0xFFDCE7CD).withOpacity(0.3));
+        Paint()..color = const Color(0xFFDCE7CD).withValues(alpha: 0.3));
 
     // U-shape forks
     path.moveTo(size.width * 0.2, 0);
@@ -434,7 +434,7 @@ class _LyrePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = const Color(0xFFDCE7CD).withOpacity(0.3)
+      ..color = const Color(0xFFDCE7CD).withValues(alpha: 0.3)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 3
       ..strokeCap = StrokeCap.round
@@ -469,7 +469,7 @@ class _LyrePainter extends CustomPainter {
 
     // Strings
     final stringPaint = Paint()
-      ..color = const Color(0xFFDCE7CD).withOpacity(0.3)
+      ..color = const Color(0xFFDCE7CD).withValues(alpha: 0.3)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.0;
 
@@ -527,7 +527,7 @@ class _EchoRingsPainter extends CustomPainter {
       final ringRadius = 70.0 + phase * 140.0;
       final ringOpacity = (1.0 - phase) * 0.40;
 
-      paint.color = const Color(0xFFDCE7CD).withOpacity(ringOpacity);
+      paint.color = const Color(0xFFDCE7CD).withValues(alpha: ringOpacity);
       canvas.drawCircle(center, ringRadius, paint);
     }
   }

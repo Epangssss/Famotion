@@ -1,10 +1,10 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:nb_utils/nb_utils.dart';
-import 'MPLoginScreen.dart';
+import 'mp_login_screen.dart';
 import '../utils/auth_helper.dart';
-import 'MPHistoryScreen.dart';
-import 'MPAnalyticsScreen.dart';
+import 'mp_history_screen.dart';
+import 'mp_analytics_screen.dart';
 
 class MPProfileScreen extends StatefulWidget {
   const MPProfileScreen({super.key});
@@ -47,7 +47,7 @@ class _MPProfileScreenState extends State<MPProfileScreen> {
                       children: [
                         CircleAvatar(
                           radius: 50,
-                          backgroundColor: textDark.withOpacity(0.15),
+                          backgroundColor: textDark.withValues(alpha: 0.15),
                           backgroundImage: _getProfileImage() ?? const AssetImage('assets/images/Famotion.png'),
                         ),
                         GestureDetector(
@@ -78,7 +78,7 @@ class _MPProfileScreenState extends State<MPProfileScreen> {
                       getStringAsync('userEmail', defaultValue: 'user@famotion.com'),
                       style: TextStyle(
                         fontSize: 14,
-                        color: textDark.withOpacity(0.7),
+                        color: textDark.withValues(alpha: 0.7),
                       ),
                     ),
                   ],
@@ -91,7 +91,7 @@ class _MPProfileScreenState extends State<MPProfileScreen> {
               // Settings List
               Container(
                 decoration: BoxDecoration(
-                  color: const Color(0xFF293B1F).withOpacity(0.6),
+                  color: const Color(0xFF293B1F).withValues(alpha: 0.6),
                   borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
                 ),
                 child: Column(
@@ -123,7 +123,7 @@ class _MPProfileScreenState extends State<MPProfileScreen> {
                       leading: Container(
                         padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
-                          color: Colors.redAccent.withOpacity(0.1),
+                          color: Colors.redAccent.withValues(alpha: 0.1),
                           shape: BoxShape.circle,
                         ),
                         child: const Icon(Icons.logout, color: Colors.redAccent),
@@ -312,7 +312,7 @@ class _MPProfileScreenState extends State<MPProfileScreen> {
       leading: Container(
         padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.1),
+          color: Colors.white.withValues(alpha: 0.1),
           shape: BoxShape.circle,
         ),
         child: Icon(icon, color: Colors.white),
@@ -323,9 +323,9 @@ class _MPProfileScreenState extends State<MPProfileScreen> {
       ),
       subtitle: Text(
         subtitle,
-        style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 12),
+        style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 12),
       ),
-      trailing: Icon(Icons.arrow_forward_ios, color: Colors.white.withOpacity(0.3), size: 16),
+      trailing: Icon(Icons.arrow_forward_ios, color: Colors.white.withValues(alpha: 0.3), size: 16),
       onTap: onTap,
     );
   }

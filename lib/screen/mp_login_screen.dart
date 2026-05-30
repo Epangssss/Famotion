@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:nb_utils/nb_utils.dart';
 import '../utils/auth_helper.dart';
-import 'MPSignUpScreen.dart';
-import 'MPForgotPasswordScreen.dart';
+import 'mp_sign_up_screen.dart';
+import 'mp_forgot_password_screen.dart';
 class MPLoginScreen extends StatefulWidget {
   const MPLoginScreen({super.key});
 
   @override
-  _MPLoginScreenState createState() => _MPLoginScreenState();
+  State<MPLoginScreen> createState() => _MPLoginScreenState();
 }
 
 class _MPLoginScreenState extends State<MPLoginScreen> {
@@ -68,7 +68,7 @@ class _MPLoginScreenState extends State<MPLoginScreen> {
                   labelText: 'Email',
                   hintText: 'Enter your email',
                   filled: true,
-                  fillColor: Colors.white.withOpacity(0.8),
+                  fillColor: Colors.white.withValues(alpha: 0.8),
                   border: OutlineInputBorder(borderRadius: radius(16), borderSide: BorderSide.none),
                   prefixIcon: const Icon(Icons.email_outlined, color: Color(0xFF6A8A53)),
                 ),
@@ -82,7 +82,7 @@ class _MPLoginScreenState extends State<MPLoginScreen> {
                   labelText: 'Password',
                   hintText: 'Enter your password',
                   filled: true,
-                  fillColor: Colors.white.withOpacity(0.8),
+                  fillColor: Colors.white.withValues(alpha: 0.8),
                   border: OutlineInputBorder(borderRadius: radius(16), borderSide: BorderSide.none),
                   prefixIcon: const Icon(Icons.lock_outline, color: Color(0xFF6A8A53)),
                 ),
@@ -131,7 +131,7 @@ class _MPLoginScreenState extends State<MPLoginScreen> {
                     border: Border.all(color: Colors.grey.shade200),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.04),
+                        color: Colors.black.withValues(alpha: 0.04),
                         blurRadius: 8,
                         offset: const Offset(0, 2),
                       ),

@@ -234,16 +234,11 @@ class AudioManager {
       // Tambahkan lagu yang dipilih saat ini
       playlistChildren.add(createSource(audioUrl, title, artist, imageUrl, durationMs));
 
-      final playlist = ConcatenatingAudioSource(
-        useLazyPreparation: true,
-        children: playlistChildren,
-      );
-      
       try {
         // Mainkan tepat di lagu yang baru saja ditambahkan (di akhir list history)
-        await audioPlayer.setAudioSource(playlist, initialIndex: playlistChildren.length - 1);
+        await audioPlayer.setAudioSources(playlistChildren, initialIndex: playlistChildren.length - 1);
       } catch (sourceError) {
-        debugPrint('⚠️ setAudioSource gagal: $sourceError');
+        debugPrint('⚠️ setAudioSources gagal: $sourceError');
       }
       
       // Update global queue preferences so it persists through the playlist
@@ -337,30 +332,31 @@ class AudioManager {
       upcomingSongsNotifier.value = newUpcomingList;
 
       // Sisipkan lagu-lagu rekomendasi ini ke dalam pemutar musik agar bisa dimainkan otomatis
-      final currentPlaylist = audioPlayer.audioSource as ConcatenatingAudioSource?;
-      if (currentPlaylist != null) {
-        List<AudioSource> upcomingSources = [];
-        for (int i = 1; i < newUpcomingList.length; i++) {
-          final t = newUpcomingList[i];
-          final mediaItem = MediaItem(
-            id: t['audioUrl'],
-            album: "Famotion",
-            title: t['title'],
-            artist: t['artist'],
-            artUri: Uri.tryParse(t['imageUrl']),
-            extras: {'durationMs': t['durationMs']},
-          );
-          if ((t['audioUrl'] as String).startsWith('assets/')) {
-            upcomingSources.add(AudioSource.asset(t['audioUrl'], tag: mediaItem));
-          } else {
-            upcomingSources.add(AudioSource.uri(
-              Uri.parse(t['audioUrl']),
-              headers: {'User-Agent': 'Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36'},
-              tag: mediaItem,
-            ));
-          }
+      List<AudioSource> upcomingSources = [];
+      for (int i = 1; i < newUpcomingList.length; i++) {
+        final t = newUpcomingList[i];
+        final mediaItem = MediaItem(
+          id: t['audioUrl'],
+          album: "Famotion",
+          title: t['title'],
+          artist: t['artist'],
+          artUri: Uri.tryParse(t['imageUrl']),
+          extras: {'durationMs': t['durationMs']},
+        );
+        if ((t['audioUrl'] as String).startsWith('assets/')) {
+          upcomingSources.add(AudioSource.asset(t['audioUrl'], tag: mediaItem));
+        } else {
+          upcomingSources.add(AudioSource.uri(
+            Uri.parse(t['audioUrl']),
+            headers: {'User-Agent': 'Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36'},
+            tag: mediaItem,
+          ));
         }
-        await currentPlaylist.addAll(upcomingSources);
+      }
+      try {
+        await audioPlayer.addAudioSources(upcomingSources);
+      } catch (e) {
+        debugPrint('⚠️ addAudioSources gagal: $e');
       }
     } catch (e) {
       debugPrint('Failed to fetch recommendations from backend: $e');

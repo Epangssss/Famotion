@@ -123,7 +123,7 @@ class _MPCameraScreenState extends State<MPCameraScreen> with SingleTickerProvid
   ];
 
   Future<Map<String, dynamic>> sendToModel(String path) async {
-    const String baseUrl = 'http://103.247.11.142';
+    const String baseUrl = 'http://192.168.0.106:5000';
 
     // Ambil userId dari local storage (disimpan saat login)
     final String userId = getStringAsync('userId');
@@ -345,7 +345,7 @@ class _MPCameraScreenState extends State<MPCameraScreen> with SingleTickerProvid
                         child: Container(
                           padding: const EdgeInsets.all(8),
                           decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.3),
+                            color: Colors.white.withValues(alpha: 0.3),
                             shape: BoxShape.circle,
                           ),
                           child: const Icon(Icons.close, color: textDark),
@@ -373,7 +373,7 @@ class _MPCameraScreenState extends State<MPCameraScreen> with SingleTickerProvid
                     "Arahkan wajah Anda ke kamera untuk deteksi emosi",
                     textAlign: TextAlign.center,
                     style: TextStyle(
-                      color: Colors.white.withOpacity(0.8),
+                      color: Colors.white.withValues(alpha: 0.8),
                       fontSize: 14,
                     ),
                   ),
@@ -389,7 +389,7 @@ class _MPCameraScreenState extends State<MPCameraScreen> with SingleTickerProvid
                     height: 80,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: Colors.white.withOpacity(0.2),
+                      color: Colors.white.withValues(alpha: 0.2),
                       border: Border.all(color: Colors.white, width: 4),
                     ),
                     child: Center(
@@ -466,7 +466,7 @@ class _MPCameraScreenState extends State<MPCameraScreen> with SingleTickerProvid
                                 height: 86,
                                 decoration: BoxDecoration(
                                   shape: BoxShape.circle,
-                                  color: Colors.black.withOpacity(0.45),
+                                  color: Colors.black.withValues(alpha: 0.45),
                                 ),
                               ),
                               Text(
@@ -484,7 +484,7 @@ class _MPCameraScreenState extends State<MPCameraScreen> with SingleTickerProvid
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                           decoration: BoxDecoration(
-                            color: Colors.black.withOpacity(0.5),
+                            color: Colors.black.withValues(alpha: 0.5),
                             borderRadius: BorderRadius.circular(16),
                           ),
                           child: const Text(
@@ -546,7 +546,7 @@ class _MPCameraScreenState extends State<MPCameraScreen> with SingleTickerProvid
                         'Famotion sedang membaca ekspresi wajah Anda...',
                         textAlign: TextAlign.center,
                         style: TextStyle(
-                          color: Colors.white.withOpacity(0.6),
+                          color: Colors.white.withValues(alpha: 0.6),
                           fontSize: 14,
                         ),
                       ),
@@ -580,7 +580,7 @@ class _MPCameraScreenState extends State<MPCameraScreen> with SingleTickerProvid
           height: 36,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: done ? gold.withOpacity(0.2) : Colors.white.withOpacity(0.06),
+            color: done ? gold.withValues(alpha: 0.2) : Colors.white.withValues(alpha: 0.06),
             border: Border.all(
               color: done ? gold : Colors.white24,
               width: 1.5,
@@ -593,7 +593,7 @@ class _MPCameraScreenState extends State<MPCameraScreen> with SingleTickerProvid
                   height: 18,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
-                    color: gold.withOpacity(0.7),
+                    color: gold.withValues(alpha: 0.7),
                   ),
                 ),
         ),
@@ -778,7 +778,7 @@ class _MPCameraScreenState extends State<MPCameraScreen> with SingleTickerProvid
                     decoration: BoxDecoration(
                       color: const Color(0xFFD8A854),
                       boxShadow: [
-                        BoxShadow(color: const Color(0xFFD8A854).withOpacity(0.8), blurRadius: 10, spreadRadius: 2),
+                        BoxShadow(color: const Color(0xFFD8A854).withValues(alpha: 0.8), blurRadius: 10, spreadRadius: 2),
                       ],
                     ),
                   ),
@@ -807,10 +807,10 @@ class _MPCameraScreenState extends State<MPCameraScreen> with SingleTickerProvid
                         : 'Posisikan wajah\ntepat di dalam garis oval',
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.85),
+                  color: Colors.white.withValues(alpha: 0.85),
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
-                  shadows: [Shadow(color: Colors.black.withOpacity(0.8), blurRadius: 8)],
+                  shadows: [Shadow(color: Colors.black.withValues(alpha: 0.8), blurRadius: 8)],
                 ),
               ),
             ),
@@ -846,7 +846,7 @@ class _MPCameraScreenState extends State<MPCameraScreen> with SingleTickerProvid
       duration: const Duration(milliseconds: 400),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
       decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.55),
+        color: Colors.black.withValues(alpha: 0.55),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: color, width: 1.5),
       ),
@@ -884,7 +884,7 @@ class FaceOverlayPainter extends CustomPainter {
     final Path ovalPath = Path()..addOval(ovalRect);
     final Path bgPath   = Path()..addRect(Rect.fromLTWH(0, 0, size.width, size.height));
     final Path overlay  = Path.combine(PathOperation.difference, bgPath, ovalPath);
-    canvas.drawPath(overlay, Paint()..color = Colors.black.withOpacity(0.65));
+    canvas.drawPath(overlay, Paint()..color = Colors.black.withValues(alpha: 0.65));
 
     // Oval border color by light status
     final Color borderColor = lightStatus == 'dark'
@@ -921,7 +921,7 @@ class FaceOverlayPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(FaceOverlayPainter old) => lightStatus != old.lightStatus;
+  bool shouldRepaint(FaceOverlayPainter oldDelegate) => lightStatus != oldDelegate.lightStatus;
 }
 
 /// Titik merah yang berkedip — indikator REC saat countdown berjalan
@@ -1019,7 +1019,7 @@ class _AnalyzingRingsState extends State<_AnalyzingRings>
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     border: Border.all(
-                      color: widget.color.withOpacity(0.15),
+                      color: widget.color.withValues(alpha: 0.15),
                       width: 2,
                     ),
                   ),
@@ -1034,7 +1034,7 @@ class _AnalyzingRingsState extends State<_AnalyzingRings>
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     border: Border.all(
-                      color: widget.color.withOpacity(0.30),
+                      color: widget.color.withValues(alpha: 0.30),
                       width: 2,
                     ),
                   ),
@@ -1048,9 +1048,9 @@ class _AnalyzingRingsState extends State<_AnalyzingRings>
                   height: 96,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: widget.color.withOpacity(0.08),
+                    color: widget.color.withValues(alpha: 0.08),
                     border: Border.all(
-                      color: widget.color.withOpacity(0.55),
+                      color: widget.color.withValues(alpha: 0.55),
                       width: 2.5,
                     ),
                   ),
@@ -1179,7 +1179,7 @@ class _EmotionResultSheetState extends State<_EmotionResultSheet>
           const SizedBox(height: 4),
           Text(
             'Emosi Dominan Terdeteksi',
-            style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 13),
+            style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 13),
           ),
 
           const SizedBox(height: 28),
@@ -1250,7 +1250,7 @@ class _EmotionResultSheetState extends State<_EmotionResultSheet>
                           borderRadius: BorderRadius.circular(6),
                           child: Container(
                             height: 10,
-                            color: Colors.white.withOpacity(0.07),
+                            color: Colors.white.withValues(alpha: 0.07),
                             child: AnimatedBuilder(
                               animation: _anim,
                               builder: (_, __) => FractionallySizedBox(
@@ -1261,7 +1261,7 @@ class _EmotionResultSheetState extends State<_EmotionResultSheet>
                                     borderRadius: BorderRadius.circular(6),
                                     color: color,
                                     boxShadow: isDom
-                                        ? [BoxShadow(color: color.withOpacity(0.5), blurRadius: 8)]
+                                        ? [BoxShadow(color: color.withValues(alpha: 0.5), blurRadius: 8)]
                                         : null,
                                   ),
                                 ),

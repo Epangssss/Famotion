@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:nb_utils/nb_utils.dart';
-import 'screen/MPSplashScreen.dart';
+import 'screen/mp_splash_screen.dart';
 import 'services/playlist_manager.dart';
 
 import 'package:just_audio_background/just_audio_background.dart';

@@ -7,7 +7,7 @@ class MPSignUpScreen extends StatefulWidget {
   const MPSignUpScreen({super.key});
 
   @override
-  _MPSignUpScreenState createState() => _MPSignUpScreenState();
+  State<MPSignUpScreen> createState() => _MPSignUpScreenState();
 }
 
 class _MPSignUpScreenState extends State<MPSignUpScreen> with SingleTickerProviderStateMixin {
@@ -105,7 +105,7 @@ class _MPSignUpScreenState extends State<MPSignUpScreen> with SingleTickerProvid
                         shape: BoxShape.circle,
                         gradient: RadialGradient(
                           colors: [
-                            const Color(0xFFD8A854).withOpacity(0.18),
+                            const Color(0xFFD8A854).withValues(alpha: 0.18),
                             Colors.transparent,
                           ],
                         ),
@@ -123,7 +123,7 @@ class _MPSignUpScreenState extends State<MPSignUpScreen> with SingleTickerProvid
                         shape: BoxShape.circle,
                         gradient: RadialGradient(
                           colors: [
-                            const Color(0xFF4CAF7D).withOpacity(0.12),
+                            const Color(0xFF4CAF7D).withValues(alpha: 0.12),
                             Colors.transparent,
                           ],
                         ),
@@ -141,7 +141,7 @@ class _MPSignUpScreenState extends State<MPSignUpScreen> with SingleTickerProvid
                         shape: BoxShape.circle,
                         gradient: RadialGradient(
                           colors: [
-                            const Color(0xFF6AB187).withOpacity(0.08),
+                            const Color(0xFF6AB187).withValues(alpha: 0.08),
                             Colors.transparent,
                           ],
                         ),
@@ -171,9 +171,9 @@ class _MPSignUpScreenState extends State<MPSignUpScreen> with SingleTickerProvid
                     child: Container(
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.1),
+                        color: Colors.white.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.white.withOpacity(0.15)),
+                        border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
                       ),
                       child: const Icon(Icons.arrow_back_ios_new_rounded, size: 18, color: Colors.white),
                     ),
@@ -188,7 +188,7 @@ class _MPSignUpScreenState extends State<MPSignUpScreen> with SingleTickerProvid
                   8.height,
                   Text(
                     'Create your account and discover music for every mood.',
-                    style: secondaryTextStyle(size: 14, color: Colors.white.withOpacity(0.55)),
+                    style: secondaryTextStyle(size: 14, color: Colors.white.withValues(alpha: 0.55)),
                   ),
                   32.height,
 
@@ -230,7 +230,7 @@ class _MPSignUpScreenState extends State<MPSignUpScreen> with SingleTickerProvid
                     padding: const EdgeInsets.only(left: 4.0),
                     child: Text(
                       'Must be at least 8 characters.',
-                      style: secondaryTextStyle(size: 12, color: Colors.white.withOpacity(0.35)),
+                      style: secondaryTextStyle(size: 12, color: Colors.white.withValues(alpha: 0.35)),
                     ),
                   ),
                   32.height,
@@ -248,7 +248,7 @@ class _MPSignUpScreenState extends State<MPSignUpScreen> with SingleTickerProvid
                             ),
                             boxShadow: [
                               BoxShadow(
-                                color: const Color(0xFFD8A854).withOpacity(0.35),
+                                color: const Color(0xFFD8A854).withValues(alpha: 0.35),
                                 blurRadius: 16,
                                 offset: const Offset(0, 6),
                               ),
@@ -270,12 +270,12 @@ class _MPSignUpScreenState extends State<MPSignUpScreen> with SingleTickerProvid
                   // Divider
                   Row(
                     children: [
-                      Expanded(child: Divider(color: Colors.white.withOpacity(0.15), thickness: 1)),
+                      Expanded(child: Divider(color: Colors.white.withValues(alpha: 0.15), thickness: 1)),
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 12),
-                        child: Text('or', style: secondaryTextStyle(size: 13, color: Colors.white.withOpacity(0.4))),
+                        child: Text('or', style: secondaryTextStyle(size: 13, color: Colors.white.withValues(alpha: 0.4))),
                       ),
-                      Expanded(child: Divider(color: Colors.white.withOpacity(0.15), thickness: 1)),
+                      Expanded(child: Divider(color: Colors.white.withValues(alpha: 0.15), thickness: 1)),
                     ],
                   ),
                   16.height,
@@ -290,9 +290,9 @@ class _MPSignUpScreenState extends State<MPSignUpScreen> with SingleTickerProvid
                       width: double.infinity,
                       padding: const EdgeInsets.symmetric(vertical: 14),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.08),
+                        color: Colors.white.withValues(alpha: 0.08),
                         borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: Colors.white.withOpacity(0.15)),
+                        border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
                       ),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -319,7 +319,7 @@ class _MPSignUpScreenState extends State<MPSignUpScreen> with SingleTickerProvid
                     children: [
                       Text(
                         'Already have an account? ',
-                        style: secondaryTextStyle(color: Colors.white.withOpacity(0.5)),
+                        style: secondaryTextStyle(color: Colors.white.withValues(alpha: 0.5)),
                       ),
                       GestureDetector(
                         onTap: () => Navigator.pop(context),
@@ -356,26 +356,26 @@ class _MPSignUpScreenState extends State<MPSignUpScreen> with SingleTickerProvid
       textFieldType: type,
       decoration: InputDecoration(
         labelText: label,
-        labelStyle: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 13),
+        labelStyle: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 13),
         hintText: hint,
-        hintStyle: TextStyle(color: Colors.white.withOpacity(0.3)),
+        hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.3)),
         filled: true,
-        fillColor: Colors.white.withOpacity(0.08),
+        fillColor: Colors.white.withValues(alpha: 0.08),
         border: OutlineInputBorder(
           borderRadius: radius(16),
-          borderSide: BorderSide(color: Colors.white.withOpacity(0.15)),
+          borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.15)),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: radius(16),
-          borderSide: BorderSide(color: Colors.white.withOpacity(0.15)),
+          borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.15)),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: radius(16),
           borderSide: const BorderSide(color: Color(0xFFD8A854), width: 1.5),
         ),
-        prefixIcon: Icon(icon, color: const Color(0xFFD8A854).withOpacity(0.8), size: 20),
+        prefixIcon: Icon(icon, color: const Color(0xFFD8A854).withValues(alpha: 0.8), size: 20),
       ),
-      textStyle: TextStyle(color: Colors.white.withOpacity(0.9)),
+      textStyle: TextStyle(color: Colors.white.withValues(alpha: 0.9)),
     );
   }
 }
@@ -399,7 +399,7 @@ class _DecorativeNote extends StatelessWidget {
       child: Icon(
         Icons.music_note_rounded,
         size: size,
-        color: Colors.white.withOpacity(opacity),
+        color: Colors.white.withValues(alpha: opacity),
       ),
     );
   }

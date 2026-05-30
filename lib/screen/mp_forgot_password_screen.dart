@@ -8,7 +8,7 @@ class MPForgotPasswordScreen extends StatefulWidget {
   const MPForgotPasswordScreen({super.key, this.initialEmail});
 
   @override
-  _MPForgotPasswordScreenState createState() => _MPForgotPasswordScreenState();
+  State<MPForgotPasswordScreen> createState() => _MPForgotPasswordScreenState();
 }
 
 class _MPForgotPasswordScreenState extends State<MPForgotPasswordScreen> {
@@ -47,7 +47,7 @@ class _MPForgotPasswordScreenState extends State<MPForgotPasswordScreen> {
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF6A8A53).withOpacity(0.1),
+                  color: const Color(0xFF6A8A53).withValues(alpha: 0.1),
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(Icons.lock_reset, size: 64, color: Color(0xFF6A8A53)),
@@ -127,7 +127,7 @@ class _MPForgotPasswordScreenState extends State<MPForgotPasswordScreen> {
         labelText: 'Email',
         hintText: 'Enter your registered email',
         filled: true,
-        fillColor: Colors.white.withOpacity(0.8),
+        fillColor: Colors.white.withValues(alpha: 0.8),
         border: OutlineInputBorder(borderRadius: radius(16), borderSide: BorderSide.none),
         prefixIcon: const Icon(Icons.email_outlined, color: Color(0xFF6A8A53)),
       ),
@@ -144,7 +144,7 @@ class _MPForgotPasswordScreenState extends State<MPForgotPasswordScreen> {
           decoration: InputDecoration(
             labelText: 'Email',
             filled: true,
-            fillColor: Colors.grey.withOpacity(0.2),
+            fillColor: Colors.grey.withValues(alpha: 0.2),
             border: OutlineInputBorder(borderRadius: radius(16), borderSide: BorderSide.none),
             prefixIcon: const Icon(Icons.email_outlined, color: Colors.grey),
           ),
@@ -157,7 +157,7 @@ class _MPForgotPasswordScreenState extends State<MPForgotPasswordScreen> {
             labelText: 'OTP Code',
             hintText: 'Enter 4-digit OTP',
             filled: true,
-            fillColor: Colors.white.withOpacity(0.8),
+            fillColor: Colors.white.withValues(alpha: 0.8),
             border: OutlineInputBorder(borderRadius: radius(16), borderSide: BorderSide.none),
             prefixIcon: const Icon(Icons.pin_outlined, color: Color(0xFF6A8A53)),
           ),
@@ -170,7 +170,7 @@ class _MPForgotPasswordScreenState extends State<MPForgotPasswordScreen> {
             labelText: 'New Password',
             hintText: 'Enter your new password',
             filled: true,
-            fillColor: Colors.white.withOpacity(0.8),
+            fillColor: Colors.white.withValues(alpha: 0.8),
             border: OutlineInputBorder(borderRadius: radius(16), borderSide: BorderSide.none),
             prefixIcon: const Icon(Icons.lock_outline, color: Color(0xFF6A8A53)),
           ),

@@ -7,12 +7,12 @@ import '../services/audio_manager.dart';
 import '../utils/notification_helper.dart';
 import '../utils/auth_helper.dart'; // import utitlity backend URL
 import '../widgets/empty_state_widget.dart';
-import 'MPSearchScreen.dart';
-import 'MPCameraScreen.dart';
-import 'MPLoginScreen.dart';
-import 'MPDiscoverScreen.dart';
-import 'MPLibraryScreen.dart';
-import 'MPProfileScreen.dart';
+import 'mp_search_screen.dart';
+import 'mp_camera_screen.dart';
+import 'mp_login_screen.dart';
+import 'mp_discover_screen.dart';
+import 'mp_library_screen.dart';
+import 'mp_profile_screen.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -406,14 +406,14 @@ class _DashboardPageState extends State<DashboardPage> {
                   Text(
                     "Opsional — isi untuk rekomendasi yang lebih akurat!",
                     style: TextStyle(
-                        color: Colors.white.withOpacity(0.5), fontSize: 13),
+                        color: Colors.white.withValues(alpha: 0.5), fontSize: 13),
                   ),
                   const SizedBox(height: 24),
 
                   // Artis Field
                   Text("Artis Favorit",
                       style: TextStyle(
-                          color: Colors.white.withOpacity(0.7),
+                          color: Colors.white.withValues(alpha: 0.7),
                           fontSize: 13,
                           fontWeight: FontWeight.w600)),
                   const SizedBox(height: 8),
@@ -450,10 +450,10 @@ class _DashboardPageState extends State<DashboardPage> {
                         style: const TextStyle(color: Colors.white),
                         decoration: InputDecoration(
                           hintText: "Contoh: Bruno Mars, Taylor Swift...",
-                          hintStyle: TextStyle(color: Colors.white.withOpacity(0.3)),
-                          prefixIcon: Icon(Icons.search, color: Colors.white.withOpacity(0.4)),
+                          hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.3)),
+                          prefixIcon: Icon(Icons.search, color: Colors.white.withValues(alpha: 0.4)),
                           filled: true,
-                          fillColor: Colors.white.withOpacity(0.08),
+                          fillColor: Colors.white.withValues(alpha: 0.08),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(14),
                             borderSide: BorderSide.none,
@@ -470,7 +470,7 @@ class _DashboardPageState extends State<DashboardPage> {
                           color: const Color(0xFF293B1F),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
-                            side: BorderSide(color: Colors.white.withOpacity(0.1)),
+                            side: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
                           ),
                           child: SizedBox(
                             width: MediaQuery.of(context).size.width - 48,
@@ -478,7 +478,7 @@ class _DashboardPageState extends State<DashboardPage> {
                               padding: EdgeInsets.zero,
                               shrinkWrap: true,
                               itemCount: options.length,
-                              separatorBuilder: (context, index) => Divider(height: 1, color: Colors.white.withOpacity(0.1)),
+                              separatorBuilder: (context, index) => Divider(height: 1, color: Colors.white.withValues(alpha: 0.1)),
                               itemBuilder: (BuildContext context, int index) {
                                 final String option = options.elementAt(index);
                                 return InkWell(
@@ -487,7 +487,7 @@ class _DashboardPageState extends State<DashboardPage> {
                                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                                     child: Row(
                                       children: [
-                                        Icon(Icons.person, color: accentGold.withOpacity(0.8), size: 20),
+                                        Icon(Icons.person, color: accentGold.withValues(alpha: 0.8), size: 20),
                                         const SizedBox(width: 12),
                                         Expanded(
                                           child: Text(
@@ -511,7 +511,7 @@ class _DashboardPageState extends State<DashboardPage> {
                   // Genre Chips
                   Text("Genre Lagu",
                       style: TextStyle(
-                          color: Colors.white.withOpacity(0.7),
+                          color: Colors.white.withValues(alpha: 0.7),
                           fontSize: 13,
                           fontWeight: FontWeight.w600)),
                   const SizedBox(height: 10),
@@ -533,12 +533,12 @@ class _DashboardPageState extends State<DashboardPage> {
                           decoration: BoxDecoration(
                             color: isSelected
                                 ? accentGold
-                                : Colors.white.withOpacity(0.08),
+                                : Colors.white.withValues(alpha: 0.08),
                             borderRadius: BorderRadius.circular(20),
                             border: Border.all(
                               color: isSelected
                                   ? accentGold
-                                  : Colors.white.withOpacity(0.12),
+                                  : Colors.white.withValues(alpha: 0.12),
                             ),
                           ),
                           child: Text(
@@ -635,7 +635,7 @@ class _DashboardPageState extends State<DashboardPage> {
                       child: Text(
                         "Lewati, langsung scan saja →",
                         style: TextStyle(
-                            color: Colors.white.withOpacity(0.4), fontSize: 13),
+                            color: Colors.white.withValues(alpha: 0.4), fontSize: 13),
                       ),
                     ),
                   ),
@@ -775,7 +775,7 @@ class _DashboardPageState extends State<DashboardPage> {
                               },
                               child: CircleAvatar(
                                 radius: 18,
-                                backgroundColor: textDark.withOpacity(0.15),
+                                backgroundColor: textDark.withValues(alpha: 0.15),
                                 backgroundImage: const AssetImage(
                                     'assets/images/Famotion.png'),
                               ),
@@ -799,13 +799,13 @@ class _DashboardPageState extends State<DashboardPage> {
                           padding: const EdgeInsets.symmetric(
                               horizontal: 16, vertical: 14),
                           decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.35),
+                              color: Colors.white.withValues(alpha: 0.35),
                               borderRadius: BorderRadius.circular(20),
                               border: Border.all(
-                                  color: Colors.white.withOpacity(0.5)),
+                                  color: Colors.white.withValues(alpha: 0.5)),
                               boxShadow: [
                                 BoxShadow(
-                                  color: Colors.black.withOpacity(0.05),
+                                  color: Colors.black.withValues(alpha: 0.05),
                                   blurRadius: 10,
                                   offset: const Offset(0, 5),
                                 )
@@ -813,12 +813,12 @@ class _DashboardPageState extends State<DashboardPage> {
                           child: Row(
                             children: [
                               Icon(Icons.search,
-                                  color: textDark.withOpacity(0.8), size: 24),
+                                  color: textDark.withValues(alpha: 0.8), size: 24),
                               const SizedBox(width: 12),
                               Text(
                                 "Cari lagu, artis, atau album...",
                                 style: TextStyle(
-                                  color: textDark.withOpacity(0.7),
+                                  color: textDark.withValues(alpha: 0.7),
                                   fontSize: 15,
                                   fontWeight: FontWeight.w500,
                                 ),
@@ -843,7 +843,7 @@ class _DashboardPageState extends State<DashboardPage> {
                           borderRadius: BorderRadius.circular(24),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.1),
+                              color: Colors.black.withValues(alpha: 0.1),
                               blurRadius: 15,
                               offset: const Offset(0, 10),
                             )
@@ -873,7 +873,7 @@ class _DashboardPageState extends State<DashboardPage> {
                               style: TextStyle(
                                 fontWeight: FontWeight.w800,
                                 fontSize: 16,
-                                color: textBrown.withOpacity(0.9),
+                                color: textBrown.withValues(alpha: 0.9),
                               ),
                             ),
                             const SizedBox(height: 8),
@@ -881,7 +881,7 @@ class _DashboardPageState extends State<DashboardPage> {
                               "Famotion hadir untuk menemukan mood musik yang tepat untuk perasaan anda.",
                               textAlign: TextAlign.center,
                               style: TextStyle(
-                                color: textBrown.withOpacity(0.8),
+                                color: textBrown.withValues(alpha: 0.8),
                                 fontSize: 14,
                               ),
                             ),
@@ -890,7 +890,7 @@ class _DashboardPageState extends State<DashboardPage> {
                               "Analysis based on your activity and input.",
                               textAlign: TextAlign.center,
                               style: TextStyle(
-                                color: textBrown.withOpacity(0.6),
+                                color: textBrown.withValues(alpha: 0.6),
                                 fontSize: 11,
                               ),
                             ),
@@ -922,7 +922,7 @@ class _DashboardPageState extends State<DashboardPage> {
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 12, vertical: 4),
                               decoration: BoxDecoration(
-                                color: textDark.withOpacity(0.15),
+                                color: textDark.withValues(alpha: 0.15),
                                 borderRadius: BorderRadius.circular(12),
                               ),
                               child: Row(
@@ -989,13 +989,13 @@ class _DashboardPageState extends State<DashboardPage> {
                                       begin: Alignment.topLeft,
                                       end: Alignment.bottomRight,
                                       colors: [
-                                        accentGold.withOpacity(0.15),
-                                        accentGold.withOpacity(0.05),
+                                        accentGold.withValues(alpha: 0.15),
+                                        accentGold.withValues(alpha: 0.05),
                                       ],
                                     ),
                                     borderRadius: BorderRadius.circular(20),
                                     border: Border.all(
-                                        color: accentGold.withOpacity(0.2)),
+                                        color: accentGold.withValues(alpha: 0.2)),
                                   ),
                                   child: Column(
                                     children: [
@@ -1015,7 +1015,7 @@ class _DashboardPageState extends State<DashboardPage> {
                                         textAlign: TextAlign.center,
                                         style: TextStyle(
                                             color:
-                                                Colors.white.withOpacity(0.5),
+                                                Colors.white.withValues(alpha: 0.5),
                                             fontSize: 13),
                                       ),
                                       const SizedBox(height: 20),
@@ -1111,7 +1111,7 @@ class _DashboardPageState extends State<DashboardPage> {
                             ),
                           ),
                           Icon(Icons.more_horiz,
-                              color: Colors.white.withOpacity(0.7)),
+                              color: Colors.white.withValues(alpha: 0.7)),
                         ],
                       ),
                       const SizedBox(height: 16),
@@ -1225,13 +1225,13 @@ class _DashboardPageState extends State<DashboardPage> {
                               borderRadius: BorderRadius.circular(20),
                               boxShadow: [
                                 BoxShadow(
-                                  color: Colors.black.withOpacity(0.4),
+                                  color: Colors.black.withValues(alpha: 0.4),
                                   blurRadius: 20,
                                   offset: const Offset(0, -4),
                                 )
                               ],
                               border: Border.all(
-                                color: Colors.white.withOpacity(0.08),
+                                color: Colors.white.withValues(alpha: 0.08),
                                 width: 1,
                               ),
                             ),
@@ -1288,7 +1288,7 @@ class _DashboardPageState extends State<DashboardPage> {
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
                                         style: TextStyle(
-                                          color: Colors.white.withOpacity(0.6),
+                                          color: Colors.white.withValues(alpha: 0.6),
                                           fontSize: 11,
                                         ),
                                       ),
@@ -1394,14 +1394,14 @@ class _DashboardPageState extends State<DashboardPage> {
               decoration: BoxDecoration(
                 color: const Color(0xFF253B1D),
                 border: Border(
-                  bottom: BorderSide(color: Colors.white.withOpacity(0.1)),
+                  bottom: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
                 ),
               ),
               child: Column(
                 children: [
                   CircleAvatar(
                     radius: 40,
-                    backgroundColor: accentGold.withOpacity(0.2),
+                    backgroundColor: accentGold.withValues(alpha: 0.2),
                     backgroundImage:
                         const AssetImage('assets/images/Famotion.png'),
                   ),
@@ -1418,7 +1418,7 @@ class _DashboardPageState extends State<DashboardPage> {
                   Text(
                     "user@famotion.com",
                     style: TextStyle(
-                      color: Colors.white.withOpacity(0.6),
+                      color: Colors.white.withValues(alpha: 0.6),
                       fontSize: 13,
                     ),
                   ),
@@ -1537,7 +1537,7 @@ class _DashboardPageState extends State<DashboardPage> {
         height: 220,
         child: Container(
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.08),
+            color: Colors.white.withValues(alpha: 0.08),
             borderRadius: BorderRadius.circular(20),
           ),
           child: Column(
@@ -1590,8 +1590,8 @@ class _DashboardPageState extends State<DashboardPage> {
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
             color: isTrackPlaying
-                ? const Color(0xFFD8A854).withOpacity(0.15)
-                : const Color(0xFF587744).withOpacity(0.4),
+                ? const Color(0xFFD8A854).withValues(alpha: 0.15)
+                : const Color(0xFF587744).withValues(alpha: 0.4),
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
               color:
@@ -1643,7 +1643,7 @@ class _DashboardPageState extends State<DashboardPage> {
               Text(
                 subtitle,
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.6),
+                  color: Colors.white.withValues(alpha: 0.6),
                   fontSize: 10,
                 ),
               ),
@@ -1655,7 +1655,7 @@ class _DashboardPageState extends State<DashboardPage> {
                   Text(
                     duration,
                     style: TextStyle(
-                      color: Colors.white.withOpacity(0.6),
+                      color: Colors.white.withValues(alpha: 0.6),
                       fontSize: 11,
                     ),
                   ),
@@ -1758,7 +1758,7 @@ class _DashboardPageState extends State<DashboardPage> {
                     Text(
                       duration,
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.6),
+                        color: Colors.white.withValues(alpha: 0.6),
                         fontSize: 12,
                       ),
                     ),
@@ -1798,7 +1798,7 @@ class _DashboardPageState extends State<DashboardPage> {
               ] else ...[
                 Icon(
                   Icons.more_horiz,
-                  color: Colors.white.withOpacity(0.5),
+                  color: Colors.white.withValues(alpha: 0.5),
                 ),
                 const SizedBox(width: 8),
                 IconButton(
@@ -1808,7 +1808,7 @@ class _DashboardPageState extends State<DashboardPage> {
                     padding: const EdgeInsets.all(6),
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: Colors.white.withOpacity(0.1),
+                      color: Colors.white.withValues(alpha: 0.1),
                     ),
                     child: const Icon(
                       Icons.play_arrow,
@@ -1850,7 +1850,7 @@ class _DashboardPageState extends State<DashboardPage> {
             child: Icon(
               Icons.favorite,
               size: 16,
-              color: iconColor.withOpacity(0.8),
+              color: iconColor.withValues(alpha: 0.8),
             ),
           ),
           Positioned(
@@ -1859,7 +1859,7 @@ class _DashboardPageState extends State<DashboardPage> {
             child: Icon(
               Icons.favorite,
               size: 20,
-              color: iconColor.withOpacity(0.8),
+              color: iconColor.withValues(alpha: 0.8),
             ),
           ),
           Positioned(
@@ -1901,14 +1901,14 @@ class _DashboardPageState extends State<DashboardPage> {
             width: 90,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: iconColor.withOpacity(0.85),
+              color: iconColor.withValues(alpha: 0.85),
               border: Border.all(
-                color: goldColor.withOpacity(0.4),
+                color: goldColor.withValues(alpha: 0.4),
                 width: 3,
               ),
               boxShadow: [
                 BoxShadow(
-                  color: goldColor.withOpacity(0.2),
+                  color: goldColor.withValues(alpha: 0.2),
                   blurRadius: 15,
                   spreadRadius: 2,
                 ),
@@ -2026,7 +2026,7 @@ class _ShimmerBoxState extends State<_ShimmerBox>
         width: widget.width,
         height: widget.height,
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(_anim.value),
+          color: Colors.white.withValues(alpha: _anim.value),
           borderRadius: BorderRadius.circular(6),
         ),
       ),

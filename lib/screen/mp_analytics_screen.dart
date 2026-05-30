@@ -78,7 +78,7 @@ class _MPAnalyticsScreenState extends State<MPAnalyticsScreen> {
                           const SizedBox(height: 8),
                           LinearProgressIndicator(
                             value: percentage / 100,
-                            backgroundColor: Colors.white.withOpacity(0.1),
+                            backgroundColor: Colors.white.withValues(alpha: 0.1),
                             color: const Color(0xFFD8A854),
                             minHeight: 8,
                             borderRadius: BorderRadius.circular(4),
@@ -91,7 +91,7 @@ class _MPAnalyticsScreenState extends State<MPAnalyticsScreen> {
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.05),
+                      color: Colors.white.withValues(alpha: 0.05),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Row(
@@ -101,7 +101,7 @@ class _MPAnalyticsScreenState extends State<MPAnalyticsScreen> {
                         Expanded(
                           child: Text(
                             "Sering-sering gunakan fitur scan mood untuk mendapatkan rekomendasi musik yang lebih pas!",
-                            style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 12),
+                            style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 12),
                           ),
                         ),
                       ],

@@ -148,7 +148,7 @@ class _MPDiscoverScreenState extends State<MPDiscoverScreen> {
                 const SizedBox(height: 4),
                 Text(
                   "Analisis emosi kamu berdasarkan Face Mood",
-                  style: TextStyle(fontSize: 14, color: textDark.withOpacity(0.7)),
+                  style: TextStyle(fontSize: 14, color: textDark.withValues(alpha: 0.7)),
                 ),
                 const SizedBox(height: 16),
                 
@@ -222,9 +222,9 @@ class _MPDiscoverScreenState extends State<MPDiscoverScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.1),
+        color: Colors.white.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white.withOpacity(0.2)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<String>(
@@ -251,9 +251,9 @@ class _MPDiscoverScreenState extends State<MPDiscoverScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.1),
+        color: Colors.white.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white.withOpacity(0.2)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<String>(
@@ -279,7 +279,7 @@ class _MPDiscoverScreenState extends State<MPDiscoverScreen> {
       width: double.infinity,
       height: 200,
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.1),
+        color: Colors.white.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(24),
       ),
       child: const Center(
@@ -297,12 +297,12 @@ class _MPDiscoverScreenState extends State<MPDiscoverScreen> {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            Colors.white.withOpacity(0.15),
-            Colors.white.withOpacity(0.05),
+            Colors.white.withValues(alpha: 0.15),
+            Colors.white.withValues(alpha: 0.05),
           ],
         ),
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.white.withOpacity(0.1)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
       ),
       child: Column(
         children: [
@@ -316,7 +316,7 @@ class _MPDiscoverScreenState extends State<MPDiscoverScreen> {
           Text(
             "Gunakan tombol 😊 Face Mood di bawah\nuntuk mulai tracking emosi kamu hari ini!",
             textAlign: TextAlign.center,
-            style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 13),
+            style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 13),
           ),
         ],
       ),
@@ -335,15 +335,15 @@ class _MPDiscoverScreenState extends State<MPDiscoverScreen> {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            moodColor.withOpacity(0.35),
-            moodColor.withOpacity(0.1),
+            moodColor.withValues(alpha: 0.35),
+            moodColor.withValues(alpha: 0.1),
           ],
         ),
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: moodColor.withOpacity(0.3), width: 1.5),
+        border: Border.all(color: moodColor.withValues(alpha: 0.3), width: 1.5),
         boxShadow: [
           BoxShadow(
-            color: moodColor.withOpacity(0.2),
+            color: moodColor.withValues(alpha: 0.2),
             blurRadius: 20,
             offset: const Offset(0, 8),
           ),
@@ -360,13 +360,13 @@ class _MPDiscoverScreenState extends State<MPDiscoverScreen> {
           const SizedBox(height: 6),
           Text(
             "$total kali deteksi pada periode ini",
-            style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 13),
+            style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 13),
           ),
           const SizedBox(height: 16),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             decoration: BoxDecoration(
-              color: moodColor.withOpacity(0.2),
+              color: moodColor.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(20),
             ),
             child: Text(
@@ -407,7 +407,7 @@ class _MPDiscoverScreenState extends State<MPDiscoverScreen> {
             borderRadius: BorderRadius.circular(6),
             child: LinearProgressIndicator(
               value: percentage / 100,
-              backgroundColor: Colors.white.withOpacity(0.08),
+              backgroundColor: Colors.white.withValues(alpha: 0.08),
               color: color,
               minHeight: 10,
             ),
@@ -431,9 +431,9 @@ class _MPDiscoverScreenState extends State<MPDiscoverScreen> {
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.15)),
+        border: Border.all(color: color.withValues(alpha: 0.15)),
       ),
       child: Row(
         children: [
@@ -458,7 +458,7 @@ class _MPDiscoverScreenState extends State<MPDiscoverScreen> {
                             borderRadius: BorderRadius.circular(4),
                             child: LinearProgressIndicator(
                               value: confidence / 100,
-                              backgroundColor: Colors.white.withOpacity(0.08),
+                              backgroundColor: Colors.white.withValues(alpha: 0.08),
                               color: color,
                               minHeight: 5,
                             ),
@@ -482,7 +482,7 @@ class _MPDiscoverScreenState extends State<MPDiscoverScreen> {
           const SizedBox(width: 8),
           Text(
             timeStr,
-            style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 11),
+            style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 11),
           ),
         ],
       ),
