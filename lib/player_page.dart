@@ -661,6 +661,7 @@ class _PlayerPageState extends State<PlayerPage> {
                             hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.5)),
                             filled: true,
                             fillColor: Colors.white.withValues(alpha: 0.1),
+
                             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
                             contentPadding: const EdgeInsets.symmetric(horizontal: 16),
                           ),
