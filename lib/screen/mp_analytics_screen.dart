@@ -36,7 +36,9 @@ class _MPAnalyticsScreenState extends State<MPAnalyticsScreen> {
     // Hitung jumlah kemunculan per emosi
     Map<String, int> counts = {};
     for (var item in statsList) {
-      final String em = (item['emotion'] ?? 'Unknown').toString().toLowerCase();
+      String em = (item['emotion'] ?? 'Unknown').toString().toLowerCase();
+      if (em == 'angry') em = 'anger';
+      if (em == 'netral') em = 'neutral';
       counts[em] = (counts[em] ?? 0) + 1;
     }
 

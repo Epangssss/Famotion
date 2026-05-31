@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:math' show pi;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:camera/camera.dart';
 import 'package:http/http.dart' as http;
 import 'package:nb_utils/nb_utils.dart';
@@ -64,6 +65,11 @@ class _MPCameraScreenState extends State<MPCameraScreen> with SingleTickerProvid
         enableAudio: false,
       );
       await _controller!.initialize();
+      try {
+        await _controller!.lockCaptureOrientation(DeviceOrientation.portraitUp);
+      } catch (e) {
+        debugPrint('Gagal lock capture orientation: $e');
+      }
       _controller!.startImageStream((image) => _checkBrightness(image));
 
       if (mounted) {
@@ -1104,13 +1110,18 @@ class _EmotionResultSheetState extends State<_EmotionResultSheet>
     'happy':    '😄',
     'sad':      '😢',
     'angry':    '😠',
- 
+    'anger':    '😠',
+    'neutral':  '😐',
+    'netral':   '😐',
   };
 
   static const Map<String, Color> _barColor = {
     'happy':    Color(0xFFD8A854),
     'sad':      Color(0xFF5B8DEF),
     'angry':    Color(0xFFEF5B5B),
+    'anger':    Color(0xFFEF5B5B),
+    'neutral':  Color(0xFF8BC34A),
+    'netral':   Color(0xFF8BC34A),
   };
 
   @override

@@ -3,6 +3,8 @@ const { spawn } = require("child_process");
 const ytSearch = require("yt-search");
 const rateLimit = require("express-rate-limit");
 const https = require("https");
+const path = require("path");
+const fs = require("fs");
 require("dotenv").config();
 
 // ==========================
@@ -143,10 +145,14 @@ function getQueryList(emotion, genre = '') {
         happy: ["Bruno Mars", "Dua Lipa", "Pharrell", "Taylor Swift", "Maroon 5", "Justin Timberlake", "Katy Perry", "Coldplay", "Ed Sheeran", "Charlie Puth"],
         sad:   ["Blue - Yung kai", "d4vd", "Billie Eilish", "Adele", "Lewis Capaldi", "Olivia Rodrigo", "Sam Smith", "Joji", "Conan Gray", "Lana Del Rey"],
         angry: ["Linkin Park", "Eminem", "Bring Me The Horizon", "Paramore", "Slipknot", "Rage Against The Machine", "System Of A Down", "Metallica", "Nirvana", "Skillet"],
+        neutral: ["Lofi Girl", "Laufey", "Aisha Badru", "Norah Jones", "Jack Johnson", "John Mayer", "Kina Grannis", "Jason Mraz", "Colbie Caillat", "Mac DeMarco"],
     };
 
-    const rawEmotion = emotion?.toLowerCase() || "happy";
-    // Hanya happy/sad/angry yang didukung; fallback ke happy
+    let rawEmotion = emotion?.toLowerCase() || "happy";
+    if (rawEmotion === "anger") rawEmotion = "angry";
+    if (rawEmotion === "netral") rawEmotion = "neutral";
+
+    // Hanya happy/sad/angry/neutral yang didukung; fallback ke happy
     const baseEmotion = Object.keys(queries).find(k => rawEmotion.startsWith(k)) || "happy";
     const genreSuffix = genre ? ` ${genre}` : "";
 
@@ -233,7 +239,7 @@ app.get("/music", async (req, res) => {
                 duration:   v.duration?.timestamp || "–",
                 thumbnail:  v.thumbnail || "",
                 videoId:    v.videoId || "",
-                stream_url: `http://103.247.11.142/stream?videoId=${v.videoId}`
+                stream_url: `http://${req.get('host') || '103.247.11.142'}/stream?videoId=${v.videoId}`
             }));
 
             return res.json({ query: rawQ, total: songs.length, songs });
@@ -326,7 +332,7 @@ app.get("/music", async (req, res) => {
             duration:   v.duration.timestamp,
             thumbnail:  v.thumbnail,
             videoId:    v.videoId,
-            stream_url: `http://103.247.11.142/stream?videoId=${v.videoId}`
+            stream_url: `http://${req.get('host') || '103.247.11.142'}/stream?videoId=${v.videoId}`
         }));
 
         res.json({ emotion: resolvedEmotion, genre, total: songs.length, songs });
@@ -381,12 +387,25 @@ app.get("/stream", (req, res) => {
 
     // LANGKAH 2: Jalankan yt-dlp dengan format M4A (bukan WebM!)
     // WebM bikin ExoPlayer Android nge-hang karena tidak ada Content-Length
-    const ytdlp = spawn("yt-dlp", [
+    const localYtdlpPath = path.join(__dirname, "yt-dlp", "yt-dlp.exe");
+    const localFfmpegPath = path.join(__dirname, "ffmpeg-8.1-essentials_build", "bin");
+
+    let ytdlpCmd = "yt-dlp";
+    const spawnArgs = [
         url,
         "-f", "bestaudio[ext=m4a]/bestaudio",
         "--no-playlist",
         "-o", "-"
-    ]);
+    ];
+
+    if (fs.existsSync(localYtdlpPath)) {
+        ytdlpCmd = localYtdlpPath;
+        if (fs.existsSync(localFfmpegPath)) {
+            spawnArgs.push("--ffmpeg-location", localFfmpegPath);
+        }
+    }
+
+    const ytdlp = spawn(ytdlpCmd, spawnArgs);
 
     ytdlp.stdout.pipe(res);
 

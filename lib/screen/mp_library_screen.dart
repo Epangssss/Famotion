@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../services/playlist_manager.dart';
-import '../services/audio_manager.dart';
 import '../player_page.dart';
 import '../utils/notification_helper.dart';
 
@@ -530,6 +529,7 @@ class _MPLibraryScreenState extends State<MPLibraryScreen> {
   // ─────────────────────────────────────────
   void _playTrack(Map<String, dynamic> track, List<Map<String, dynamic>> allTracks, int startIndex) {
     final videoId = track['videoId'] ?? '';
+    final audioUrl = track['audioUrl'] ?? '';
     final title = track['title'] ?? 'Unknown';
     final artist = track['artist'] ?? 'Unknown';
     final imageUrl = track['imageUrl'] ?? '';
@@ -542,17 +542,19 @@ class _MPLibraryScreenState extends State<MPLibraryScreen> {
       ...allTracks.sublist(startIndex),
       ...allTracks.sublist(0, startIndex),
     ];
-    AudioManager.instance.upcomingSongsNotifier.value = reordered.map((t) => Map<String, dynamic>.from(t)).toList();
+    final queue = reordered.map((t) => Map<String, dynamic>.from(t)).toList();
 
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => PlayerPage(
-          videoId: videoId.isNotEmpty ? videoId : '',
+          videoId: videoId,
+          audioUrl: audioUrl,
           title: title,
           artist: artist,
           imageUrl: imageUrl,
           durationMs: durationMs,
+          initialQueue: queue,
         ),
       ),
     );

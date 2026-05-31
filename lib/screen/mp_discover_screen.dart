@@ -90,6 +90,9 @@ class _MPDiscoverScreenState extends State<MPDiscoverScreen> {
     'happy': {'emoji': '😊', 'color': const Color(0xFFE2B86C), 'label': 'Happy'},
     'sad': {'emoji': '😢', 'color': const Color(0xFF8BA6C9), 'label': 'Sad'},
     'angry': {'emoji': '😡', 'color': const Color(0xFFD67373), 'label': 'Angry'},
+    'anger': {'emoji': '😡', 'color': const Color(0xFFD67373), 'label': 'Anger'},
+    'neutral': {'emoji': '😐', 'color': const Color(0xFF8BC34A), 'label': 'Neutral'},
+    'netral': {'emoji': '😐', 'color': const Color(0xFF8BC34A), 'label': 'Neutral'},
   };
 
   @override
@@ -490,14 +493,16 @@ class _MPDiscoverScreenState extends State<MPDiscoverScreen> {
   }
 
   String _getMoodAdvice(String emotion) {
-    switch (emotion) {
+    switch (emotion.toLowerCase()) {
       case 'happy':
         return '🌟 Kamu sedang dalam mood terbaik! Nikmati harimu!';
       case 'sad':
         return '💙 Dengarkan musik yang mengangkat semangat!';
       case 'angry':
+      case 'anger':
         return '🔥 Tarik napas dalam, coba musik relaksasi.';
       case 'neutral':
+      case 'netral':
         return '☺️ Tenang dan stabil, waktu yang bagus untuk eksplorasi!';
       case 'fear':
         return '🌈 Kamu aman! Dengarkan musik yang menenangkan.';

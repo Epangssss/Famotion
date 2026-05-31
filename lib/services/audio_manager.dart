@@ -142,6 +142,7 @@ class AudioManager {
     bool isFromHistory = false,
     String? queueGenre,
     String? queueMood,
+    List<Map<String, dynamic>>? initialQueue,
   }) async {
     final int requestId = ++_playRequestId;
 
@@ -174,16 +175,20 @@ class AudioManager {
       durationMsNotifier.value = durationMs;
       
       // Update ui seketika agar gambar tidak nunggu rekomendasi selesai di-load
-      upcomingSongsNotifier.value = [
-        {
-          'videoId': '',
-           'audioUrl': audioUrl,
-          'title': title,
-          'artist': artist,
-          'imageUrl': imageUrl,
-          'durationMs': durationMs,
-        }
-      ];
+      if (initialQueue != null && initialQueue.isNotEmpty) {
+        upcomingSongsNotifier.value = initialQueue;
+      } else {
+        upcomingSongsNotifier.value = [
+          {
+            'videoId': '',
+            'audioUrl': audioUrl,
+            'title': title,
+            'artist': artist,
+            'imageUrl': imageUrl,
+            'durationMs': durationMs,
+          }
+        ];
+      }
 
       // Reset current index when explicitly playing a new search/dashboard song
       // (This will be overridden if playNext or playFromPlaylist is called)
@@ -202,20 +207,30 @@ class AudioManager {
       debugPrint('🎵 Playing: $audioUrl');
       
       // Deteksi asset lokal vs URL jaringan
-      AudioSource createSource(String url, String t, String a, String img, int? dur) {
+      AudioSource createSource(String url, String t, String a, String img, int? dur, {String? videoId}) {
+        String resolvedUrl = url;
+        if (resolvedUrl.isEmpty && videoId != null && videoId.isNotEmpty) {
+          if (videoId.startsWith('http://') || videoId.startsWith('https://')) {
+            resolvedUrl = videoId;
+          } else {
+            resolvedUrl = getMusicApiUrl('/stream?videoId=$videoId');
+          }
+        }
+        
+        resolvedUrl = interceptLocalStreamUrl(resolvedUrl);
         final mediaItem = MediaItem(
-          id: url,
+          id: resolvedUrl,
           album: "Famotion",
           title: t,
           artist: a,
           artUri: Uri.tryParse(img),
           extras: {'durationMs': dur},
         );
-        if (url.startsWith('assets/')) {
-          return AudioSource.asset(url, tag: mediaItem);
+        if (resolvedUrl.startsWith('assets/')) {
+          return AudioSource.asset(resolvedUrl, tag: mediaItem);
         } else {
           return AudioSource.uri(
-            Uri.parse(url),
+            Uri.parse(resolvedUrl),
             headers: {'User-Agent': 'Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36'},
             tag: mediaItem,
           );
@@ -231,12 +246,26 @@ class AudioManager {
             prev['audioUrl'], prev['title'], prev['artist'], prev['imageUrl'], prev['durationMs']));
       }
       
-      // Tambahkan lagu yang dipilih saat ini
-      playlistChildren.add(createSource(audioUrl, title, artist, imageUrl, durationMs));
+      if (initialQueue != null && initialQueue.isNotEmpty) {
+        // Tambahkan seluruh queue dari initialQueue (dimulai dengan lagu saat ini di index 0)
+        for (var item in initialQueue) {
+          playlistChildren.add(createSource(
+            item['audioUrl'] ?? '',
+            item['title'] ?? '',
+            item['artist'] ?? '',
+            item['imageUrl'] ?? '',
+            item['durationMs'],
+            videoId: item['videoId'],
+          ));
+        }
+      } else {
+        // Tambahkan lagu yang dipilih saat ini saja
+        playlistChildren.add(createSource(audioUrl, title, artist, imageUrl, durationMs));
+      }
 
       try {
         // Mainkan tepat di lagu yang baru saja ditambahkan (di akhir list history)
-        await audioPlayer.setAudioSources(playlistChildren, initialIndex: playlistChildren.length - 1);
+        await audioPlayer.setAudioSources(playlistChildren, initialIndex: _playbackHistory.length);
       } catch (sourceError) {
         debugPrint('⚠️ setAudioSources gagal: $sourceError');
       }
@@ -252,9 +281,10 @@ class AudioManager {
       // Rekam jejak lagu ke Server Cloud
       AuthHelper().saveListeningHistory(audioUrl, title, artist, imageUrl, durationMs ?? 0);
 
-      // Fire and forget recommendation fetcher
-      // Gunakan kombinasi Mood + Genre jika tersedia, kalau tidak, baru fallback acak.
-      _fetchRecommendations(title, artist, imageUrl);
+      // Fire and forget recommendation fetcher jika initialQueue kosong
+      if (initialQueue == null || initialQueue.isEmpty) {
+        _fetchRecommendations(title, artist, imageUrl);
+      }
     } catch (e) {
       if (_playRequestId == requestId) {
         debugPrint("Error playing music: $e");
@@ -335,19 +365,22 @@ class AudioManager {
       List<AudioSource> upcomingSources = [];
       for (int i = 1; i < newUpcomingList.length; i++) {
         final t = newUpcomingList[i];
+        String resolvedUrl = t['audioUrl'] ?? '';
+        resolvedUrl = interceptLocalStreamUrl(resolvedUrl);
+
         final mediaItem = MediaItem(
-          id: t['audioUrl'],
+          id: resolvedUrl,
           album: "Famotion",
           title: t['title'],
           artist: t['artist'],
           artUri: Uri.tryParse(t['imageUrl']),
           extras: {'durationMs': t['durationMs']},
         );
-        if ((t['audioUrl'] as String).startsWith('assets/')) {
-          upcomingSources.add(AudioSource.asset(t['audioUrl'], tag: mediaItem));
+        if (resolvedUrl.startsWith('assets/')) {
+          upcomingSources.add(AudioSource.asset(resolvedUrl, tag: mediaItem));
         } else {
           upcomingSources.add(AudioSource.uri(
-            Uri.parse(t['audioUrl']),
+            Uri.parse(resolvedUrl),
             headers: {'User-Agent': 'Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36'},
             tag: mediaItem,
           ));
@@ -371,11 +404,16 @@ class AudioManager {
     int? durationMs,
     String? queueGenre,
     String? queueMood,
+    List<Map<String, dynamic>>? initialQueue,
   }) async {
     final int requestId = ++_playRequestId;
     try {
-      // Menggunakan backend Node.js untuk bypass youtube_explode_dart error.
-      final String audioUrl = getMusicApiUrl('/stream?videoId=$videoId');
+      String audioUrl;
+      if (videoId.startsWith('http://') || videoId.startsWith('https://')) {
+        audioUrl = videoId;
+      } else {
+        audioUrl = getMusicApiUrl('/stream?videoId=$videoId');
+      }
 
       if (_playRequestId != requestId) return;
 
@@ -387,9 +425,24 @@ class AudioManager {
         durationMs: durationMs,
         queueGenre: queueGenre,
         queueMood: queueMood,
+        initialQueue: initialQueue,
       );
     } catch (e) {
       debugPrint("Failed to play youtube video: $e");
+    }
+  }
+
+  Future<void> jumpToQueueIndex(int queueIndex) async {
+    final sequence = audioPlayer.sequence;
+    
+    // Indeks lagu saat ini di dalam sequence
+    final currentSeqIndex = audioPlayer.currentIndex ?? 0;
+    
+    // Target index di sequence adalah: index lagu saat ini + queueIndex
+    // Karena queueIndex 0 adalah lagu yang sedang diputar
+    final targetSeqIndex = currentSeqIndex + queueIndex;
+    if (targetSeqIndex >= 0 && targetSeqIndex < sequence.length) {
+      await audioPlayer.seek(Duration.zero, index: targetSeqIndex);
     }
   }
 
@@ -414,6 +467,17 @@ class AudioManager {
     } else {
       await audioPlayer.seek(Duration.zero);
     }
+  }
+
+  Future<void> stopAndClear() async {
+    await audioPlayer.stop();
+    isPlayingNotifier.value = false;
+    currentUrlNotifier.value = null;
+    titleNotifier.value = null;
+    artistNotifier.value = null;
+    imageUrlNotifier.value = null;
+    durationMsNotifier.value = null;
+    upcomingSongsNotifier.value = [];
   }
 
   void dispose() {
