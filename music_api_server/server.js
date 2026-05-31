@@ -20,9 +20,12 @@ function getQueryList(emotion) {
     happy: ["Bruno Mars", "Dua Lipa", "Pharrell", "upbeat pop hits", "Taylor Swift", "Maroon 5", "Justin Timberlake", "Katy Perry", "Coldplay", "Ed Sheeran happy"],
     sad: ["Blue - Yung kai", "d4vd", "Billie Eilish", "sad emotional pop", "Adele", "Lewis Capaldi", "Olivia Rodrigo", "Sam Smith", "Joji", "Conan Gray"],
     angry: ["Linkin Park", "Eminem", "hard rock", "Bring Me The Horizon", "Paramore", "Slipknot", "Rage Against The Machine", "System Of A Down", "Metallica", "Nirvana"],
+    neutral: ["Lofi Girl", "Laufey", "Aisha Badru", "lofi beats", "Norah Jones", "Jack Johnson", "John Mayer", "Kina Grannis", "Jason Mraz", "Colbie Caillat"],
   };
 
-  const rawEmotion = emotion?.toLowerCase() || "relax";
+  let rawEmotion = emotion?.toLowerCase() || "relax";
+  if (rawEmotion === "anger") rawEmotion = "angry";
+  if (rawEmotion === "netral") rawEmotion = "neutral";
   
   // Pisahkan root mood dan preferensi tambahan (genre/artist)
   let baseEmotion = rawEmotion;

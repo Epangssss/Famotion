@@ -228,7 +228,7 @@ class _MPSearchScreenState extends State<MPSearchScreen> {
                                     physics: const BouncingScrollPhysics(),
                                     itemCount: _searchResults.length,
                                     itemBuilder: (context, index) {
-                                      return _buildSearchResultItem(_searchResults[index]);
+                                      return _buildSearchResultItem(_searchResults[index], index);
                                     },
                                   ),
               ),
@@ -239,7 +239,7 @@ class _MPSearchScreenState extends State<MPSearchScreen> {
     );
   }
 
-  Widget _buildSearchResultItem(dynamic video) {
+  Widget _buildSearchResultItem(dynamic video, int index) {
     final String title = video['title'] ?? 'Unknown';
     final String artist = video['artist'] ?? 'Unknown';
     final String imageUrl = video['thumbnail'] ?? '';
@@ -262,6 +262,30 @@ class _MPSearchScreenState extends State<MPSearchScreen> {
     return GestureDetector(
       onTap: () {
         showSlidingInfoNotification(context, "Lagu akan segera diputar, mohon bersabar...");
+        
+        final initialQueue = _searchResults.sublist(index).map((track) {
+          int trackDurMs = 0;
+          final String trackDurStr = track['duration'] ?? '';
+          if (trackDurStr.isNotEmpty) {
+            final p = trackDurStr.split(':');
+            try {
+              if (p.length == 2) {
+                trackDurMs = (int.parse(p[0]) * 60 + int.parse(p[1])) * 1000;
+              } else if (p.length == 3) {
+                trackDurMs = (int.parse(p[0]) * 3600 + int.parse(p[1]) * 60 + int.parse(p[2])) * 1000;
+              }
+            } catch (_) {}
+          }
+          return {
+            'videoId': track['videoId'] ?? '',
+            'audioUrl': '',
+            'title': track['title'] ?? 'Unknown',
+            'artist': track['artist'] ?? 'Unknown',
+            'imageUrl': track['thumbnail'] ?? '',
+            'durationMs': trackDurMs,
+          };
+        }).toList();
+
         Navigator.push(
           context,
           MaterialPageRoute(
@@ -271,6 +295,7 @@ class _MPSearchScreenState extends State<MPSearchScreen> {
               artist: artist,
               imageUrl: imageUrl,
               durationMs: durationMs,
+              initialQueue: initialQueue,
             ),
           ),
         );

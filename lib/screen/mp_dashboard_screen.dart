@@ -169,6 +169,7 @@ class _DashboardPageState extends State<DashboardPage> {
     required String artist,
     required String imageUrl,
     String? durationStr,
+    List<Map<String, dynamic>>? initialQueue,
     bool navigate = true,
   }) async {
     if (_isStartingPlayback) return;
@@ -188,6 +189,7 @@ class _DashboardPageState extends State<DashboardPage> {
         durationMs: _parseDuration(durationStr),
         queueGenre: _prefGenre,
         queueMood: _currentRootMood,
+        initialQueue: initialQueue,
       );
 
       if (navigate && mounted) {
@@ -196,9 +198,11 @@ class _DashboardPageState extends State<DashboardPage> {
           MaterialPageRoute(
             builder: (_) => PlayerPage(
               videoId: '', // Not using YouTube if playing from dashboard
+              audioUrl: audioUrl,
               title: title,
               artist: artist,
               imageUrl: imageUrl,
+              initialQueue: initialQueue,
             ),
           ),
         );
@@ -331,11 +335,47 @@ class _DashboardPageState extends State<DashboardPage> {
         'stream_url': 'assets/genre/Angry/_Áurea cósmica - Japanese Version [Super Slowed].mp3'
       },
     ],
+    'neutral': [
+      {
+        'title': 'Miracles',
+        'artist': 'Alexis Ffrench',
+        'duration': 'Full',
+        'thumbnail': _localThumb,
+        'videoId': 'local_n1',
+        'stream_url': 'assets/genre/Happy/Alexis Ffrench - Miracles (SPOTISAVER).mp3'
+      },
+      {
+        'title': 'Copland Appalachian Spring VII',
+        'artist': 'Aaron Copland',
+        'duration': 'Full',
+        'thumbnail': _localThumb,
+        'videoId': 'local_n2',
+        'stream_url': 'assets/genre/Happy/Aaron Copland, Aurora Orchestra, Nicholas Collon - Copland Appalachian Spring VII. Variations on a Shaker Hymn.Doppiomovimento(SPOTISAVER).mp3'
+      },
+      {
+        'title': 'A Thousand Years',
+        'artist': 'Unknown',
+        'duration': 'Full',
+        'thumbnail': _localThumb,
+        'videoId': 'local_n3',
+        'stream_url': 'assets/genre/Sad/compressed_A Thousand Years.mp3'
+      },
+      {
+        'title': 'Atlantis',
+        'artist': 'Unknown',
+        'duration': 'Full',
+        'thumbnail': _localThumb,
+        'videoId': 'local_n4',
+        'stream_url': 'assets/genre/Sad/compressed_Atlantis.mp3'
+      },
+    ],
   };
 
   /// Ambil local songs yang cocok dengan base mood
   List<Map<String, dynamic>> _getLocalSongs(String emotion) {
-    final base = emotion.toLowerCase();
+    var base = emotion.toLowerCase();
+    if (base == 'anger') base = 'angry';
+    if (base == 'netral') base = 'neutral';
     for (final key in _moodLocalSongs.keys) {
       if (base.startsWith(key)) return List.from(_moodLocalSongs[key]!);
     }
@@ -1084,6 +1124,7 @@ class _DashboardPageState extends State<DashboardPage> {
                                           track['thumbnail'] ??
                                               'https://images.unsplash.com/photo-1518837695005-2083093ee35b?q=80&w=256&auto=format&fit=crop',
                                           audioUrl,
+                                          index,
                                         ),
                                       );
                                     },
@@ -1147,6 +1188,7 @@ class _DashboardPageState extends State<DashboardPage> {
                             .entries
                             .map((entry) {
                           var track = entry.value;
+                          final listIndex = entry.key + 10;
                           final previewUrl = track['preview'];
                           final streamUrl = track['stream_url'];
                           final audioUrl = streamUrl ?? previewUrl;
@@ -1163,6 +1205,7 @@ class _DashboardPageState extends State<DashboardPage> {
                             track['thumbnail'] ??
                                 'https://images.unsplash.com/photo-1490730141103-6cac27aaab94?q=80&w=150&auto=format&fit=crop',
                             audioUrl,
+                            listIndex,
                           );
                         }),
 
@@ -1321,6 +1364,17 @@ class _DashboardPageState extends State<DashboardPage> {
                                   ),
                                   onPressed: () {
                                     AudioManager.instance.playNext();
+                                  },
+                                ),
+                                // Close/Stop Player
+                                IconButton(
+                                  icon: const Icon(
+                                    Icons.close_rounded,
+                                    color: Colors.white54,
+                                    size: 24,
+                                  ),
+                                  onPressed: () {
+                                    AudioManager.instance.stopAndClear();
                                   },
                                 ),
                               ],
@@ -1569,18 +1623,33 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   Widget _buildImageTrackCard(String title, String subtitle, String duration,
-      String imageUrl, String? audioUrl) {
+      String imageUrl, String? audioUrl, int index) {
     bool isTrackPlaying =
         _currentlyPlayingUrl == audioUrl && _isPlaying && audioUrl != null;
     return GestureDetector(
         onTap: () {
           if (audioUrl != null) {
+            final initialQueue = _musicList.sublist(index).map((track) {
+              final previewUrl = track['preview'];
+              final streamUrl = track['stream_url'];
+              final aUrl = streamUrl ?? previewUrl;
+              return {
+                'videoId': track['videoId'] ?? '',
+                'audioUrl': aUrl,
+                'title': track['title'] ?? 'Unknown',
+                'artist': track['artist'] ?? 'Unknown',
+                'imageUrl': track['thumbnail'] ?? '',
+                'durationMs': _parseDuration(track['duration']),
+              };
+            }).toList();
+
             _playAndNavigate(
               audioUrl: audioUrl,
               title: title,
               artist: subtitle,
               imageUrl: imageUrl,
               durationStr: duration,
+              initialQueue: initialQueue,
               navigate: true,
             );
           }
@@ -1677,12 +1746,27 @@ class _DashboardPageState extends State<DashboardPage> {
                     ),
                     onPressed: () {
                       if (audioUrl != null) {
+                        final initialQueue = _musicList.sublist(index).map((track) {
+                          final previewUrl = track['preview'];
+                          final streamUrl = track['stream_url'];
+                          final aUrl = streamUrl ?? previewUrl;
+                          return {
+                            'videoId': track['videoId'] ?? '',
+                            'audioUrl': aUrl,
+                            'title': track['title'] ?? 'Unknown',
+                            'artist': track['artist'] ?? 'Unknown',
+                            'imageUrl': track['thumbnail'] ?? '',
+                            'durationMs': _parseDuration(track['duration']),
+                          };
+                        }).toList();
+
                         _playAndNavigate(
                           audioUrl: audioUrl,
                           title: title,
                           artist: subtitle,
                           imageUrl: imageUrl,
                           durationStr: duration,
+                          initialQueue: initialQueue,
                           navigate: false,
                         );
                       }
@@ -1697,16 +1781,31 @@ class _DashboardPageState extends State<DashboardPage> {
 
   // Widget for the List Items in the "For You" Section
   Widget _buildPlaylistItem(String title, String subtitle, String duration,
-      bool isPlaying, String imageUrl, String? audioUrl) {
+      bool isPlaying, String imageUrl, String? audioUrl, int index) {
     return GestureDetector(
         onTap: () {
           if (audioUrl != null) {
+            final initialQueue = _musicList.sublist(index).map((track) {
+              final previewUrl = track['preview'];
+              final streamUrl = track['stream_url'];
+              final aUrl = streamUrl ?? previewUrl;
+              return {
+                'videoId': track['videoId'] ?? '',
+                'audioUrl': aUrl,
+                'title': track['title'] ?? 'Unknown',
+                'artist': track['artist'] ?? 'Unknown',
+                'imageUrl': track['thumbnail'] ?? '',
+                'durationMs': _parseDuration(track['duration']),
+              };
+            }).toList();
+
             _playAndNavigate(
               audioUrl: audioUrl,
               title: title,
               artist: subtitle,
               imageUrl: imageUrl,
               durationStr: duration,
+              initialQueue: initialQueue,
               navigate: true,
             );
           }
@@ -1784,12 +1883,27 @@ class _DashboardPageState extends State<DashboardPage> {
                   ),
                   onPressed: () {
                     if (audioUrl != null) {
+                      final initialQueue = _musicList.sublist(index).map((track) {
+                        final previewUrl = track['preview'];
+                        final streamUrl = track['stream_url'];
+                        final aUrl = streamUrl ?? previewUrl;
+                        return {
+                          'videoId': track['videoId'] ?? '',
+                          'audioUrl': aUrl,
+                          'title': track['title'] ?? 'Unknown',
+                          'artist': track['artist'] ?? 'Unknown',
+                          'imageUrl': track['thumbnail'] ?? '',
+                          'durationMs': _parseDuration(track['duration']),
+                        };
+                      }).toList();
+
                       _playAndNavigate(
                         audioUrl: audioUrl,
                         title: title,
                         artist: subtitle,
                         imageUrl: imageUrl,
                         durationStr: duration,
+                        initialQueue: initialQueue,
                         navigate: false,
                       );
                     }
@@ -1818,12 +1932,27 @@ class _DashboardPageState extends State<DashboardPage> {
                   ),
                   onPressed: () {
                     if (audioUrl != null) {
+                      final initialQueue = _musicList.sublist(index).map((track) {
+                        final previewUrl = track['preview'];
+                        final streamUrl = track['stream_url'];
+                        final aUrl = streamUrl ?? previewUrl;
+                        return {
+                          'videoId': track['videoId'] ?? '',
+                          'audioUrl': aUrl,
+                          'title': track['title'] ?? 'Unknown',
+                          'artist': track['artist'] ?? 'Unknown',
+                          'imageUrl': track['thumbnail'] ?? '',
+                          'durationMs': _parseDuration(track['duration']),
+                        };
+                      }).toList();
+
                       _playAndNavigate(
                         audioUrl: audioUrl,
                         title: title,
                         artist: subtitle,
                         imageUrl: imageUrl,
                         durationStr: duration,
+                        initialQueue: initialQueue,
                         navigate: false,
                       );
                     }

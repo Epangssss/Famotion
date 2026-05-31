@@ -7,8 +7,9 @@
     "express": "^5.2.1",
     "google-auth-library": "^10.6.2",
     "jsonwebtoken": "^9.0.3",
-    "mongoose": "^9.4.1",
-    "nodemailer": "^8.0.5"
+    "mongoose": "^9.6.3",
+    "nodemailer": "^8.0.10",
+    "yt-search": "^2.13.1"
   },
   "name": "famotion",
   "description": "A new Flutter project.",

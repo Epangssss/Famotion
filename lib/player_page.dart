@@ -10,20 +10,24 @@ import 'package:marquee/marquee.dart';
 
 class PlayerPage extends StatefulWidget {
   final String videoId;
+  final String? audioUrl;
   final String title;
   final String artist;
   final String imageUrl;
   final String? searchQuery;
   final int? durationMs;
+  final List<Map<String, dynamic>>? initialQueue;
 
   const PlayerPage({
     super.key,
     required this.videoId,
+    this.audioUrl,
     required this.title,
     required this.artist,
     required this.imageUrl,
     this.searchQuery,
     this.durationMs,
+    this.initialQueue,
   });
 
   @override
@@ -49,6 +53,16 @@ class _PlayerPageState extends State<PlayerPage> {
         artist: widget.artist,
         imageUrl: widget.imageUrl,
         durationMs: widget.durationMs,
+        initialQueue: widget.initialQueue,
+      );
+    } else if (widget.audioUrl != null && widget.audioUrl!.isNotEmpty) {
+      AudioManager.instance.playMusic(
+        audioUrl: widget.audioUrl!,
+        title: widget.title,
+        artist: widget.artist,
+        imageUrl: widget.imageUrl,
+        durationMs: widget.durationMs,
+        initialQueue: widget.initialQueue,
       );
     } else if (widget.searchQuery != null && widget.searchQuery!.isNotEmpty) {
       _searchAndPlay(widget.searchQuery!);
@@ -140,25 +154,7 @@ class _PlayerPageState extends State<PlayerPage> {
     if (index < 0 || index >= upcoming.length) return;
 
     setState(() => _currentIndex = index);
-
-    final track = upcoming[index];
-    final videoId = track['videoId'] as String?;
-
-    if (videoId != null && videoId.isNotEmpty) {
-      await AudioManager.instance.playYoutubeVideo(
-        videoId: videoId,
-        title: track['title'] as String,
-        artist: track['artist'] as String,
-        imageUrl: track['imageUrl'] as String,
-      );
-    } else if (track['audioUrl'] != null) {
-      await AudioManager.instance.playMusic(
-        audioUrl: track['audioUrl'] as String,
-        title: track['title'] as String,
-        artist: track['artist'] as String,
-        imageUrl: track['imageUrl'] as String,
-      );
-    }
+    await AudioManager.instance.jumpToQueueIndex(index);
   }
 
   String _formatDuration(Duration? duration) {
@@ -594,12 +590,18 @@ class _PlayerPageState extends State<PlayerPage> {
     // Fallback if not playing audioUrl right now
     if (audioUrl == null || audioUrl.isEmpty) return;
 
+    String extractedId = '';
+    if (audioUrl.contains('videoId=')) {
+      final uri = Uri.parse(audioUrl);
+      extractedId = uri.queryParameters['videoId'] ?? '';
+    }
+
     final track = {
       'title': title,
       'artist': artist,
       'imageUrl': imageUrl,
       'audioUrl': audioUrl,
-      'videoId': audioUrl, // We might not have raw videoId, audioUrl is standard key
+      'videoId': extractedId.isNotEmpty ? extractedId : audioUrl,
     };
 
     final isLikedNow = await PlaylistManager.instance.toggleLike(track);
@@ -620,12 +622,18 @@ class _PlayerPageState extends State<PlayerPage> {
     
     if (audioUrl == null || audioUrl.isEmpty) return;
 
+    String extractedId = '';
+    if (audioUrl.contains('videoId=')) {
+      final uri = Uri.parse(audioUrl);
+      extractedId = uri.queryParameters['videoId'] ?? '';
+    }
+
     final track = {
       'title': title,
       'artist': artist,
       'imageUrl': imageUrl,
       'audioUrl': audioUrl,
-      'videoId': audioUrl, 
+      'videoId': extractedId.isNotEmpty ? extractedId : audioUrl,
     };
 
     TextEditingController newPlaylistController = TextEditingController();

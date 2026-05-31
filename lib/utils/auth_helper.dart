@@ -7,14 +7,25 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import '../services/playlist_manager.dart';
 
-const String vpsIp = '103.247.11.142'; // VPS Database and Node.js Music Server
+// const String vpsIp = '103.247.11.142'; // VPS Database and Node.js Music Server (DISABLED)
+const String localHost = '192.168.0.106'; // For local Node.js testing on Mobile/Emulator
+const String localMusicPort = '2000';
+const String localBackendPort = '4000';
 
 String getBackendUrl(String endpoint) {
-  return 'http://$vpsIp$endpoint';
+  return 'http://$localHost:$localBackendPort$endpoint';
 }
 
 String getMusicApiUrl(String endpoint) {
-  return 'http://$vpsIp$endpoint';
+  return 'http://$localHost:$localMusicPort$endpoint';
+}
+
+// Replaces saved stream URLs (which might contain the VPS IP) to use local IP
+String interceptLocalStreamUrl(String url) {
+  if (url.contains('103.247.11.142')) {
+    return url.replaceAll('103.247.11.142', '$localHost:$localMusicPort');
+  }
+  return url;
 }
 
 class AuthHelper {

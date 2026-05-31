@@ -201,11 +201,44 @@ def predict_frame(crop_face):
 def process_video(video_path, request_id):
     cap = cv2.VideoCapture(video_path)
 
+    # Enable auto-rotation from metadata if supported
+    auto_rotated = False
+    if hasattr(cv2, 'CAP_PROP_ORIENTATION_AUTO'):
+        auto_rotated = cap.set(cv2.CAP_PROP_ORIENTATION_AUTO, 1)
+
     if not cap.isOpened():
         raise RuntimeError("Video tidak bisa dibuka")
 
+    # Read orientation metadata
+    rotation = 0
+    if hasattr(cv2, 'CAP_PROP_ORIENTATION_META'):
+        rotation = cap.get(cv2.CAP_PROP_ORIENTATION_META)
+
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     fps = cap.get(cv2.CAP_PROP_FPS)
+
+    # Detect if manual rotation is needed
+    ret, test_frame = cap.read()
+    needs_manual_rotation = False
+    rotation_code = None
+    if ret:
+        h, w = test_frame.shape[:2]
+        # Reset VideoCapture
+        cap.release()
+        cap = cv2.VideoCapture(video_path)
+        if hasattr(cv2, 'CAP_PROP_ORIENTATION_AUTO'):
+            cap.set(cv2.CAP_PROP_ORIENTATION_AUTO, 1)
+
+        # If metadata is portrait rotation (90/270) but frame is still landscape
+        if rotation in [90, 270] and w > h:
+            needs_manual_rotation = True
+            if rotation == 90:
+                rotation_code = cv2.ROTATE_90_CLOCKWISE
+            elif rotation == 270:
+                rotation_code = cv2.ROTATE_90_COUNTERCLOCKWISE
+        elif rotation == 180:
+            needs_manual_rotation = True
+            rotation_code = cv2.ROTATE_180
 
     frame_idx = 0
     used_frames = 0
@@ -225,6 +258,10 @@ def process_video(video_path, request_id):
 
         if used_frames >= MAX_USED_FRAMES:
             break
+
+        # Apply manual rotation if OpenCV's auto-rotation didn't work
+        if needs_manual_rotation and rotation_code is not None:
+            frame = cv2.rotate(frame, rotation_code)
 
         crop_face, masked_frame = detect_face_roi(frame)
 
