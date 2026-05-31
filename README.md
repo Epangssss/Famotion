@@ -1,4 +1,4 @@
-# Famotion (Face Mood Tracking Music Recomendation)
+# Famotion (Face Mood Emotion)
 
 A new Flutter project. For TA Manajeman Infromatika
 
