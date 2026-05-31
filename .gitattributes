@@ -1,0 +1,8 @@
+# Mengabaikan folder besar dan pihak ketiga dari statistik bahasa GitHub
+model_vps/ffmpeg-*/** linguist-vendored
+model_vps/node_modules/** linguist-vendored
+model_vps/yt-dlp/** linguist-vendored
+server/node_modules/** linguist-vendored
+
+# Jangan hitung file HTML sebagai bahasa utama (karena file doc ffmpeg sangat besar)
+*.html linguist-detectable=false

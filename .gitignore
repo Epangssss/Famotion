@@ -54,3 +54,10 @@ app.*.map.json
 /android/app/release
 python/revisi_model/models/
 *.keras
+
+# Node.js
+node_modules/
+
+# Binaries
+model_vps/ffmpeg-*
+model_vps/yt-dlp
