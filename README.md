@@ -1,4 +1,4 @@
-````md
+
 <div align="center">
 
 # 🎵 Famotion  
@@ -166,4 +166,3 @@ GitHub: [Epangssss](https://github.com/Epangssss)
 **Face Mood Emotion Detection & Music Recommendation**
 
 </div>
-```
