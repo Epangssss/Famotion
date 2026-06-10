@@ -143,7 +143,7 @@ Contoh hasil prediksi dari backend:
 
 ## 🎯 Tujuan Project
 
-Project ini dibuat sebagai media rekomendasi terapi musik berbasis mobile dengan memanfaatkan deteksi emosi wajah.
+Project ini dibuat sebagai media rekomendasi emotion musik berbasis mobile dengan memanfaatkan deteksi emosi wajah.
 
 Dengan adanya aplikasi ini, pengguna dapat memperoleh rekomendasi musik yang lebih sesuai dengan kondisi emosinya.
 
