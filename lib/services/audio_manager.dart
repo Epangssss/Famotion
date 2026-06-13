@@ -236,7 +236,7 @@ class AudioManager {
           );
         }
       }
-
+      
       // Bangun playlist baru yang mencakup History dan lagu saat ini
       List<AudioSource> playlistChildren = [];
       
@@ -266,6 +266,7 @@ class AudioManager {
       try {
         // Mainkan tepat di lagu yang baru saja ditambahkan (di akhir list history)
         await audioPlayer.setAudioSources(playlistChildren, initialIndex: _playbackHistory.length);
+        await audioPlayer.setLoopMode(LoopMode.all); // Loop daftar lagu agar terus menyala
       } catch (sourceError) {
         debugPrint('⚠️ setAudioSources gagal: $sourceError');
       }

@@ -134,7 +134,6 @@ async function ytApiSearch(query, limit = 5) {
         return r.videos.slice(0, limit);
     } catch { return []; }
 }
-
 // ==========================
 // EMOTION → QUERY MAPPING
 // ==========================
@@ -239,7 +238,7 @@ app.get("/music", async (req, res) => {
                 duration: v.duration?.timestamp || "–",
                 thumbnail: v.thumbnail || "",
                 videoId: v.videoId || "",
-                stream_url: `http://${req.get('host') || '103.247.11.142'}/stream?videoId=${v.videoId}`
+                stream_url: `http://${req.get('host') || 'localhost:2000'}/stream?videoId=${v.videoId}`
             }));
 
             return res.json({ query: rawQ, total: songs.length, songs });
@@ -319,23 +318,46 @@ app.get("/music", async (req, res) => {
         }
 
         // ==========================
-        // STEP 4: Shuffle Fisher-Yates
+        // STEP 4: ANALISIS AUDIO + RANKING MOOD
         // ==========================
-        for (let i = unique.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [unique[i], unique[j]] = [unique[j], unique[i]];
+        const host = req.get("host") || "localhost:2000";
+
+        const songs = await recommendByAudioMood(
+            unique,
+            resolvedEmotion,
+            Math.min(limit, 10),
+            host
+        );
+
+        if (songs.length > 0) {
+            return res.json({
+                emotion: resolvedEmotion,
+                genre,
+                method: "youtube_audio_librosa_mood_detection",
+                total: songs.length,
+                songs
+            });
         }
 
-        const songs = unique.slice(0, limit).map(v => ({
+        // Fallback kalau analisis audio gagal semua
+        const fallbackSongs = unique.slice(0, limit).map(v => ({
             title: v.title,
-            artist: v.author.name,
-            duration: v.duration.timestamp,
-            thumbnail: v.thumbnail,
-            videoId: v.videoId,
-            stream_url: `http://${req.get('host') || '103.247.11.142'}/stream?videoId=${v.videoId}`
+            artist: v.author?.name || "Unknown",
+            duration: v.duration?.timestamp || "–",
+            thumbnail: v.thumbnail || "",
+            videoId: v.videoId || "",
+            stream_url: `http://${host}/stream?videoId=${v.videoId}`,
+            detected_mood: "unknown",
+            mood_score: 0
         }));
 
-        res.json({ emotion: resolvedEmotion, genre, total: songs.length, songs });
+        return res.json({
+            emotion: resolvedEmotion,
+            genre,
+            method: "fallback_without_audio_analysis",
+            total: fallbackSongs.length,
+            songs: fallbackSongs
+        });
 
     } catch (err) {
         console.error("[/music error]", err.message);

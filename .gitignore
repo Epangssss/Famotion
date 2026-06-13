@@ -61,3 +61,9 @@ node_modules/
 # Binaries
 model_vps/ffmpeg-*
 model_vps/yt-dlp
+
+# Huge Media Files
+*.mp3
+*.mp4
+*.jpg
+

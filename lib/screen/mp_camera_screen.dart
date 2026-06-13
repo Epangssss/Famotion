@@ -737,8 +737,19 @@ class _MPCameraScreenState extends State<MPCameraScreen> with SingleTickerProvid
         sortedEmotions: sorted,
         maxVal: maxVal,
         onPlay: () {
+          // Ambil top 2 emosi yang confiden-nya > 20%
+          String resultEmotions = sorted
+              .take(2)
+              .where((e) => (e.value as num).toDouble() > 20.0)
+              .map((e) => e.key)
+              .join(', ');
+          
+          if (resultEmotions.isEmpty) {
+            resultEmotions = topEmotions.first;
+          }
+
           Navigator.pop(context); // tutup sheet
-          Navigator.pop(context, topEmotions.first); // kembalikan mood ke Dashboard
+          Navigator.pop(context, resultEmotions); // kembalikan mood gabungan ke Dashboard
         },
         onRetry: () {
           Navigator.pop(context);

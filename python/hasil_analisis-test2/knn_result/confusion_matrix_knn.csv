@@ -1,0 +1,5 @@
+﻿,pred_angry,pred_happy,pred_sad,pred_neutral
+actual_angry,23,0,0,0
+actual_happy,4,23,0,0
+actual_sad,0,0,2,0
+actual_neutral,0,3,0,7
