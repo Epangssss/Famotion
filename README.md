@@ -181,7 +181,7 @@ Dengan adanya aplikasi ini, pengguna dapat memperoleh rekomendasi musik yang leb
 
 ## 👨‍💻 Developer
 
-**EdoLanpram**
+**Edward Lanpram**
 Program Studi Manajemen Informatika
 Politeknik Negeri Jember
 
