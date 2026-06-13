@@ -1,0 +1,33 @@
+=== HASIL EVALUASI KNN MOOD LAGU ===
+Sumber data folder: C:\famotion\famotion\python\label-final
+CSV fitur: C:\famotion\famotion\python\label-final\hasil_training_knn\fitur_lagu_dari_folder.csv
+Label mood: ['angry', 'happy', 'neutral', 'sad']
+Jumlah data: 311
+Distribusi label:
+label_final
+neutral    106
+sad         89
+happy       76
+angry       40
+Name: count, dtype: int64
+Fitur: ['tempo_bpm', 'rms_energy', 'loudness_db', 'spectral_centroid', 'spectral_rolloff', 'zero_crossing_rate', 'valence', 'arousal', 'aggression', 'mfcc_1', 'mfcc_2', 'mfcc_3', 'mfcc_4', 'mfcc_5', 'mfcc_6', 'mfcc_7', 'mfcc_8', 'mfcc_9', 'mfcc_10', 'mfcc_11', 'mfcc_12', 'mfcc_13']
+Parameter terbaik: {'knn__metric': 'manhattan', 'knn__n_neighbors': 3, 'knn__weights': 'distance'}
+Akurasi: 0.5238095238095238
+
+Classification Report:
+              precision    recall  f1-score   support
+
+       angry       0.50      0.38      0.43         8
+       happy       0.60      0.60      0.60        15
+     neutral       0.53      0.41      0.46        22
+         sad       0.48      0.67      0.56        18
+
+    accuracy                           0.52        63
+   macro avg       0.53      0.51      0.51        63
+weighted avg       0.53      0.52      0.52        63
+
+Confusion Matrix:
+[[ 3  1  3  1]
+ [ 1  9  3  2]
+ [ 2  1  9 10]
+ [ 0  4  2 12]]

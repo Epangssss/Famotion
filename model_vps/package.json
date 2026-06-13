@@ -18,6 +18,7 @@
     "google-auth-library": "^10.6.2",
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^9.6.3",
+    "music-metadata": "^7.14.0",
     "nodemailer": "^8.0.10",
     "yt-search": "^2.13.1"
   },

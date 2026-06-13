@@ -1,0 +1,13 @@
+=== CLASSIFICATION REPORT KNN ===
+Akurasi testing: 88.71%
+
+              precision    recall  f1-score   support
+
+       angry       0.85      1.00      0.92        23
+       happy       0.88      0.85      0.87        27
+     neutral       1.00      0.70      0.82        10
+         sad       1.00      1.00      1.00         2
+
+    accuracy                           0.89        62
+   macro avg       0.93      0.89      0.90        62
+weighted avg       0.89      0.89      0.88        62

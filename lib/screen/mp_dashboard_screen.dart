@@ -2,15 +2,15 @@ import 'package:flutter/material.dart';
 import 'dart:ui';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:flutter/services.dart';
 import '../player_page.dart';
 import '../services/audio_manager.dart';
+import '../services/playlist_manager.dart';
 import '../utils/notification_helper.dart';
-import '../utils/auth_helper.dart'; // import utitlity backend URL
 import '../widgets/empty_state_widget.dart';
 import 'mp_search_screen.dart';
 import 'mp_camera_screen.dart';
 import 'mp_login_screen.dart';
-import 'mp_discover_screen.dart';
 import 'mp_library_screen.dart';
 import 'mp_profile_screen.dart';
 
@@ -65,19 +65,9 @@ class _DashboardPageState extends State<DashboardPage> {
   String _currentEmotion = "";
   String _currentRootMood = ""; // Mood murni tanpa artis/genre untuk antrean
 
-  // Genre yang aktif saat fetch (diset sebelum memanggil _fetchMusic)
-  String _fetchGenre = '';
-  String _fetchArtist = '';
-
   Future<void> _fetchMusic({String? emotion, String? genre, String? artist}) async {
     if (emotion != null) {
       _currentEmotion = emotion;
-    }
-    if (genre != null) {
-      _fetchGenre = genre;
-    }
-    if (artist != null) {
-      _fetchArtist = artist;
     }
 
     if (_currentEmotion.isEmpty) {
@@ -96,48 +86,83 @@ class _DashboardPageState extends State<DashboardPage> {
     });
 
     try {
-      // Gunakan ?emotion= agar server masuk jalur rekomendasi berbasis emosi
-      // Tambahkan ?genre= agar Last.fm API diaktifkan di server
-      String endpoint = '/music?emotion=${Uri.encodeComponent(_currentEmotion)}';
-      if (_fetchGenre.isNotEmpty) {
-        endpoint += '&genre=${Uri.encodeComponent(_fetchGenre)}';
-      }
-      if (_fetchArtist.isNotEmpty) {
-        endpoint += '&artist=${Uri.encodeComponent(_fetchArtist)}';
-      }
-      final url = Uri.parse(getMusicApiUrl(endpoint));
-      final response = await http.get(url);
+      // 1. Baca file JSON dari assets
+      final String jsonString = await rootBundle.loadString('assets/data/hasil_analisis_lagu_knn.json');
+      final List<dynamic> allSongs = json.decode(jsonString);
 
-      if (response.statusCode == 200) {
-        if (mounted) {
-          setState(() {
-            var data = json.decode(response.body);
-            List<dynamic> songs = data['songs'] ?? [];
-            songs.shuffle();
-            // Gabungkan local songs di depan list
-            final localSongs = _getLocalSongs(_currentEmotion);
-            _musicList = [...localSongs, ...songs];
-            _isLoading = false;
-          });
-        }
-      } else {
-        if (mounted) {
-          setState(() {
-            _isLoading = false;
-            _hasError = true;
-            _errorMessage =
-                "Gagal memuat data dari server (${response.statusCode}).";
-          });
-        }
+      // 2. Filter berdasarkan mood
+      var resolvedEmotion = _currentEmotion.toLowerCase();
+      if (resolvedEmotion == "anger") resolvedEmotion = "angry";
+      if (resolvedEmotion == "netral") resolvedEmotion = "neutral";
+
+      var filteredSongs = allSongs.where((s) {
+        final m = (s['knn_predicted_mood'] ?? s['predicted_mood'] ?? "unknown").toString().toLowerCase();
+        return m.contains(resolvedEmotion) || resolvedEmotion.contains(m);
+      }).toList();
+
+      if (filteredSongs.length < 30) {
+        final remaining = allSongs.where((s) => !filteredSongs.contains(s)).toList();
+        remaining.shuffle();
+        filteredSongs.addAll(remaining.take(30 - filteredSongs.length));
+      }
+
+      // Shuffle ulang sebelum dipotong
+      filteredSongs.shuffle();
+      filteredSongs = filteredSongs.take(30).toList();
+      filteredSongs = filteredSongs.take(30).toList();
+
+      final host = '192.168.0.106:2000'; // Sesuaikan jika API pindah host
+      
+      // 3. Format hasil agar sesuai struktur UI dan buat playlist
+      final String playlistName = "Mood: ${_currentEmotion[0].toUpperCase()}${_currentEmotion.substring(1)}";
+      await PlaylistManager.instance.createPlaylist(playlistName);
+
+      final finalSongs = <Map<String, dynamic>>[];
+      for (var s in filteredSongs) {
+        String moodFolder = s['knn_predicted_mood'] ?? s['predicted_mood'] ?? 'unknown';
+        String folderLabel = s['original_folder_label'] ?? 'random';
+        String actualFileName = "${folderLabel}__${s['file_name']}";
+        // Harus match dengan path absolut di server python (karena ini untuk new_app.js)
+        String actualFilePath = "C:\\famotion\\famotion\\python\\clean_by_knn_mood-test2\\$moodFolder\\$actualFileName";
+        // Windows path dipisah dengan backslash, pastikan benar!
+
+        // Encode ke base64
+        String vId = base64Encode(utf8.encode(actualFilePath));
+
+        final songMap = {
+          'title': s['file_name'].toString().replaceAll(RegExp(r'\.[a-zA-Z0-9]+$'), ''),
+          'artist': "Famotion Local Music",
+          'duration': '03:00', // Default duration if not available
+          'thumbnail': "http://$host/cover?videoId=${Uri.encodeComponent(vId)}",
+          'videoId': vId,
+          'stream_url': "http://$host/stream?videoId=${Uri.encodeComponent(vId)}",
+          'detected_mood': s['knn_predicted_mood'] ?? s['predicted_mood'] ?? 'unknown',
+          'mood_score': s['knn_confidence'] ?? s['confidence'] ?? 0,
+          'method': 'knn'
+        };
+        finalSongs.add(songMap);
+
+        // Tambahkan ke Custom Playlist otomatis!
+        await PlaylistManager.instance.addToPlaylist(playlistName, songMap);
+      }
+
+      if (mounted) {
+        setState(() {
+          // Jika finalSongs ada isinya, kita pakai itu saja agar tidak bentrok dengan asset lama yang mungkin rusak.
+          // Jika kosong, baru kita fallback ke localSongs bawaan.
+          final localSongs = _getLocalSongs(_currentEmotion);
+          _musicList = finalSongs.isNotEmpty ? finalSongs : localSongs;
+          _isLoading = false;
+        });
       }
     } catch (e) {
+      debugPrint("Error memuat JSON KNN Lokal: $e");
       if (mounted) {
         final localSongs = _getLocalSongs(_currentEmotion);
         setState(() {
           _isLoading = false;
           _hasError = localSongs.isEmpty;
-          _errorMessage =
-              "Koneksi ke server musik gagal. Menampilkan lagu lokal saja.";
+          _errorMessage = "Gagal memuat lagu KNN lokal. Menggunakan lagu bawaan.";
           _musicList = localSongs;
         });
       }
@@ -448,14 +473,44 @@ class _DashboardPageState extends State<DashboardPage> {
                     style: TextStyle(
                         color: Colors.white.withValues(alpha: 0.5), fontSize: 13),
                   ),
+                  const SizedBox(height: 16),
+                  
+                  // Notifikasi Fitur Dinonaktifkan
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.orange.withValues(alpha: 0.4)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.info_outline, color: Colors.orange, size: 20),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            "Dalam tahap pengembangan. Pemilihan artis & genre dinonaktifkan sementara karena sistem beralih ke analisis AI lokal.",
+                            style: TextStyle(color: Colors.orange.shade200, fontSize: 12),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                   const SizedBox(height: 24),
 
-                  // Artis Field
-                  Text("Artis Favorit",
-                      style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.7),
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600)),
+                  // Gunakan IgnorePointer agar tidak bisa diklik dan Opacity agar terlihat mati
+                  Opacity(
+                    opacity: 0.4,
+                    child: IgnorePointer(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Artis Field
+                          Text("Artis Favorit",
+                              style: TextStyle(
+                                  color: Colors.white.withValues(alpha: 0.7),
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600)),
                   const SizedBox(height: 8),
                   Autocomplete<String>(
                     initialValue: TextEditingValue(text: _prefArtist),
@@ -595,6 +650,10 @@ class _DashboardPageState extends State<DashboardPage> {
                       );
                     }).toList(),
                   ),
+                        ],
+                      ),
+                    ),
+                  ),
                   const SizedBox(height: 28),
 
                   // Tombol Mulai Scan
@@ -626,7 +685,19 @@ class _DashboardPageState extends State<DashboardPage> {
                             emotion: detectedEmotion.toLowerCase(),
                             genre: _prefGenre, // dikirim sebagai ?genre=
                             artist: _prefArtist, // dikirim sebagai ?artist=
-                          );
+                          ).then((_) {
+                            if (_musicList.isNotEmpty) {
+                              final song = _musicList.first;
+                              _playAndNavigate(
+                                audioUrl: song['stream_url'] ?? '',
+                                title: song['title'] ?? 'Unknown',
+                                artist: song['artist'] ?? 'Unknown',
+                                imageUrl: song['thumbnail'] ?? '',
+                                durationStr: song['duration']?.toString(),
+                                initialQueue: _musicList.cast<Map<String, dynamic>>(),
+                              );
+                            }
+                          });
                         }
                       },
                       icon: const Icon(Icons.camera_alt_rounded,
@@ -669,7 +740,19 @@ class _DashboardPageState extends State<DashboardPage> {
                             emotion: detectedEmotion.toLowerCase(),
                             genre: '',
                             artist: '',
-                          );
+                          ).then((_) {
+                            if (_musicList.isNotEmpty) {
+                              final song = _musicList.first;
+                              _playAndNavigate(
+                                audioUrl: song['stream_url'] ?? '',
+                                title: song['title'] ?? 'Unknown',
+                                artist: song['artist'] ?? 'Unknown',
+                                imageUrl: song['thumbnail'] ?? '',
+                                durationStr: song['duration']?.toString(),
+                                initialQueue: _musicList.cast<Map<String, dynamic>>(),
+                              );
+                            }
+                          });
                         }
                       },
                       child: Text(
@@ -705,7 +788,15 @@ class _DashboardPageState extends State<DashboardPage> {
     final List<Widget> screens = [
       _buildHomeContent(bgTop, bgMid, bgBottom, cardGradientStart,
           cardGradientEnd, textDark, textBrown, accentGold),
-      const MPDiscoverScreen(),
+      // const MPDiscoverScreen(), // YT Music Discover dinonaktifkan
+      const Scaffold(
+        backgroundColor: Color(0xFF1A2A14), 
+        body: Center(
+          child: Text("Fitur YouTube Music Discover\ndinonaktifkan sementara.", 
+          textAlign: TextAlign.center,
+          style: TextStyle(color: Colors.white70, fontSize: 16))
+        )
+      ),
       const MPLibraryScreen(),
       const MPProfileScreen(),
     ];
@@ -825,7 +916,7 @@ class _DashboardPageState extends State<DashboardPage> {
                       ),
                       const SizedBox(height: 24),
 
-                      // Search Bar (Navigasi ke MPSearchScreen)
+                      // Search Bar (Hanya untuk mencari YT Music, sesuai permintaan)
                       GestureDetector(
                         onTap: () {
                           Navigator.push(
