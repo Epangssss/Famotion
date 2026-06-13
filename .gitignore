@@ -60,3 +60,7 @@ model_vps/yt-dlp
 *.mp4
 *.jpg
 
+debug_crops/
+debug_frames/
+models/
+uploads/
