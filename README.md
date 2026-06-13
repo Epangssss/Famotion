@@ -33,10 +33,22 @@ Hasil deteksi emosi kemudian digunakan untuk memberikan rekomendasi musik yang s
 
 - 📷 Deteksi emosi wajah melalui kamera atau gambar
 - 🧠 Klasifikasi emosi menggunakan model machine learning
-- 🎧 Rekomendasi musik berdasarkan hasil mood
+- 🎧 Rekomendasi musik berdasarkan hasil mood (mendukung pemutaran **Local** dan **YT Music**)
 - 📱 Tampilan aplikasi mobile yang sederhana dan mudah digunakan
-- 🔗 Integrasi Flutter dengan backend Python Flask
+- 🔗 Integrasi Flutter dengan backend Python Flask dan Node.js
 - 📊 Menampilkan hasil prediksi emosi dan confidence
+
+---
+
+## 🎵 Sumber Pemutaran Musik
+
+Famotion mendukung dua metode penyediaan musik untuk direkomendasikan kepada pengguna:
+
+1. **Local Music (Dataset Internal)**  
+   Sistem membaca dan memutar lagu secara langsung dari database atau penyimpanan lokal server. Lagu-lagu pada dataset ini telah dianalisis nilai emosinya terlebih dahulu menggunakan algoritma **K-Nearest Neighbor (KNN)** agar presisi dengan hasil deteksi wajah pengguna.
+
+2. **YouTube Music (YT Music / Stream)**  
+   Aplikasi secara dinamis dapat mencari dan melakukan *streaming* lagu dari YouTube berdasarkan *mood* pengguna. Fitur ini terintegrasi menggunakan backend *Node.js* yang memanfaatkan *library* `yt-dlp` dan `ffmpeg` untuk memproses audio (dapat dilihat pada folder `model_vps` dan `music_api_server`). Hal ini memungkinkan rekomendasi lagu yang lebih *up-to-date* dan tak terbatas.
 
 ---
 
@@ -67,21 +79,39 @@ Hasil deteksi emosi kemudian digunakan untuk memberikan rekomendasi musik yang s
 ```bash
 Famotion/
 │
-├── lib/
-│   ├── main.dart
-│   ├── pages/
-│   ├── services/
-│   └── widgets/
+├── lib/                     # Aplikasi mobile (Flutter)
+│   ├── main.dart            # Entry point aplikasi
+│   ├── models/              # Struktur model data
+│   ├── screen/              # Halaman/UI aplikasi
+│   ├── services/            # Integrasi API & Backend
+│   ├── utils/               # Fungsi utilitas
+│   └── widgets/             # Komponen UI reusable
 │
-├── assets/
-│   ├── images/
-│   └── icons/
+├── python/                  # Skrip & Model Machine Learning (Python)
+│   ├── revisi_model/        # Pengembangan/revisi model ML
+│   ├── analisis_dataset_lagu.py
+│   └── knn_mood_lagu.py
 │
-├── android/
-├── ios/
-├── pubspec.yaml
-└── README.md
-````
+├── model_vps/               # Backend server untuk VPS (Node.js)
+│   ├── app.js
+│   └── mongo.js
+│
+├── server/                  # Backend API utama (Flask & Node.js)
+│   ├── app.py
+│   └── app.js
+│
+├── music_api_server/        # Layanan API untuk musik (Node.js)
+│   ├── app.js
+│   └── server.js
+│
+├── assets/                  # Aset statis aplikasi (gambar, ikon, dll)
+├── android/                 # Build konfigurasi Android
+├── ios/                     # Build konfigurasi iOS
+├── windows/                 # Build konfigurasi Windows
+├── web/                     # Build konfigurasi Web
+├── pubspec.yaml             # Konfigurasi package/dependensi Flutter
+└── README.md                # Dokumentasi project
+```
 
 ---
 
