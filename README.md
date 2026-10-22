@@ -14,6 +14,31 @@ Aplikasi mobile berbasis Flutter untuk mendeteksi emosi wajah pengguna dan membe
 
 ---
 
+## 📱 Preview Aplikasi
+
+<div align="center">
+
+<table>
+  <tr>
+    <td align="center">
+      <img src="/1.jpg" width="240" alt="Famotion Screenshot 1">
+    </td>
+    <td align="center">
+      <img src="/2.jpg" width="240" alt="Famotion Screenshot 2">
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="/3.jpeg" width="240" alt="Famotion Screenshot 3">
+    </td>
+    <td align="center">
+      <img src="/4.jpg" width="240" alt="Famotion Screenshot 4">
+    </td>
+  </tr>
+</table>
+
+</div>
+
 ## 📱 Tentang Aplikasi
 
 **Famotion** adalah aplikasi mobile yang dikembangkan untuk kebutuhan Tugas Akhir Program Studi Manajemen Informatika.
