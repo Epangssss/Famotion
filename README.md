@@ -24,6 +24,9 @@ Aplikasi mobile berbasis Flutter untuk mendeteksi emosi wajah pengguna dan membe
       <img src="/1.jpg" width="240" alt="Famotion Screenshot 1">
     </td>
     <td align="center">
+      <img src="/5.png" width="240" alt="Famotion Screenshot 2">
+    </td>
+      <td align="center">
       <img src="/2.jpg" width="240" alt="Famotion Screenshot 2">
     </td>
   </tr>
@@ -33,6 +36,9 @@ Aplikasi mobile berbasis Flutter untuk mendeteksi emosi wajah pengguna dan membe
     </td>
     <td align="center">
       <img src="/4.jpg" width="240" alt="Famotion Screenshot 4">
+    </td>
+      <td align="center">
+      <img src="/6.jpg" width="240" alt="Famotion Screenshot 4">
     </td>
   </tr>
 </table>
